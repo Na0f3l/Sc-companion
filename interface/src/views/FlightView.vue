@@ -1,6 +1,6 @@
 <script setup lang="ts">
 // Écrans affichés quand le personnage est aux commandes d'un vaisseau.
-import { computed } from 'vue'
+import { computed, watch } from 'vue'
 import { ACT, FLI, NO_VALUE, VEH, WPN, annunciator, bool, has, num, str } from '@/telemetry'
 import MfdPanel from '@/components/MfdPanel.vue'
 import SegBar from '@/components/SegBar.vue'
@@ -11,6 +11,7 @@ import Diagnostics from '@/components/Diagnostics.vue'
 import VitalRings from '@/components/VitalRings.vue'
 import GMeter from '@/components/GMeter.vue'
 import { impactLeadTime, timeToImpact } from '@/alerts'
+import { type Mode, learnSpeed, speedMax } from '@/speedmax'
 
 const fr = new Intl.NumberFormat('en-US')
 
@@ -23,7 +24,6 @@ const tti = computed(timeToImpact)
 
 // Vitesse : négative en marche arrière (à confirmer en jeu : la jauge passe alors en bleu)
 const speed = computed(() => num(`${FLI}speed`))
-const SPEED_MAX = 1200 // m/s pour une barre pleine
 // Zones relevées sur le HUD du jeu (barre pleine) : 25 % vert, 50 % jaune, 25 % rouge
 const SPEED_ZONES: Zone[] = [
   { to: 0.25, color: '#57e389' },
@@ -41,6 +41,12 @@ const mode = computed<{ label: string; guessed: boolean } | null>(() => {
   if (!bool(`${VEH}power.powerplants`)) return null // vaisseau éteint
   return { label: annunciator('qdrv') === 'off' ? 'SCM' : 'NAV', guessed: true }
 })
+
+// Échelle de la barre de vitesse : vitesse max du vaisseau dans ce mode (connue, apprise ou par défaut, voir speedmax.ts)
+const shipClass = computed(() => str(`${VEH}class_name`))
+const speedMode = computed<Mode>(() => (mode.value?.label === 'NAV' ? 'NAV' : 'SCM'))
+const maxSpeed = computed(() => speedMax(shipClass.value, speedMode.value))
+watch(speed, (v) => learnSpeed(shipClass.value, speedMode.value, Math.abs(v)))
 
 const BOOST_ZONES: Zone[] = [
   { to: 0.25, color: '#ff5b4f' },
@@ -120,7 +126,8 @@ const role = computed(() => {
           </span>
           <div class="pair">
             <VBar
-              :value="Math.abs(speed) / SPEED_MAX"
+              :value="Math.abs(speed) / maxSpeed.value"
+              :title="`Full bar = ${maxSpeed.value} m/s (${maxSpeed.source})`"
               :zones="SPEED_ZONES"
               :reverse="speed < 0"
               :reading="Math.round(Math.abs(speed)).toString()"
