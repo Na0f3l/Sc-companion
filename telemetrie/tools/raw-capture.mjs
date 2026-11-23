@@ -69,7 +69,7 @@ function note(key, known, wt, value, t) {
       series.set(key, arr)
     }
   }
-  if (s.samples.length < 6 && !s.samples.includes(String(value))) s.samples.push(String(value))
+  if (s.samples.length < 24 && !s.samples.includes(String(value))) s.samples.push(String(value))
 }
 
 function walk(buf, type, prefix, t) {
@@ -129,8 +129,13 @@ call.on('data', (buf) => {
 })
 call.on('error', (e) => { if (e.code !== grpc.status.CANCELLED) { console.error('Erreur :', e.details || e.message); finish() } })
 const timer = setTimeout(finish, SECONDS * 1000)
+// Ctrl+C : on arrête et on enregistre ce qui a déjà été capté
+process.on('SIGINT', finish)
 
+let done = false
 function finish() {
+  if (done) return
+  done = true
   clearTimeout(timer)
   call.cancel()
   client.close()
