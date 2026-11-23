@@ -7,6 +7,7 @@ import SegBar from '@/components/SegBar.vue'
 import SpeedGauge from '@/components/SpeedGauge.vue'
 import HeadingTape from '@/components/HeadingTape.vue'
 import Annunciators from '@/components/Annunciators.vue'
+import VitalRings from '@/components/VitalRings.vue'
 
 const fr = new Intl.NumberFormat('fr-FR')
 
@@ -56,7 +57,6 @@ const GEAR: Record<string, string> = { DEPLOYED: 'Sorti', RETRACTED: 'Rentré', 
 const gear = computed(() => str(`${VEH}flight.state.gear`).replace('VEHICLE_COMPONENT_DEPLOYMENT_STATE_', ''))
 
 // ---- Pilote ----
-const hp = computed(() => num(`${ACT}vitals.health.current`) / (num(`${ACT}vitals.health.max`, 100) || 100))
 const ROLE: Record<string, string> = { PILOT: 'Pilote', COPILOT: 'Copilote', TURRET: 'Tourelle' }
 const role = computed(() => {
   const r = str(`${ACT}state.crew_role`).replace('ACTOR_CREW_ROLE_', '')
@@ -152,8 +152,7 @@ const role = computed(() => {
     </MfdPanel>
 
     <MfdPanel title="Pilote" source="actor.vitals" tab="ÉQUIPAGE">
-      <div class="row"><span class="lbl">Santé</span><span class="num mid">{{ Math.round(num(ACT + 'vitals.health.current')) }}</span></div>
-      <SegBar :value="hp" :segments="10" />
+      <VitalRings />
       <div class="cols">
         <div class="stack">
           <span class="lbl">Cardio</span>
