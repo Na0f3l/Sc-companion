@@ -125,6 +125,7 @@ const proximity = (minSpeed: number) =>
 // L'alerte orange « obstacle » ne s'affiche qu'au-dessus de cette vitesse : un posé sportif
 // mais maîtrisé (en station notamment) reste silencieux.
 const OBSTACLE_MIN_SPEED = 60 // m/s
+const proxLit = () => annunciator('prox') !== 'off' && annunciator('prox') !== 'nominal' && !gearDown() && !bool(`${VEH}flight.state.is_landed`)
 
 // Au-dessus de cette vitesse, un crash ou une collision devient une alerte importante (rouge + son)
 const FAST = 100 // m/s
@@ -139,7 +140,9 @@ const RULES: AlertRule[] = [
   { id: 'ground-fast', group: 'crash', level: 'critical', message: 'Crash imminent', active: () => ground() && fast() },
   { id: 'collision-fast', group: 'collision', level: 'critical', message: 'Collision imminent', active: () => proximity(OBSTACLE_MIN_SPEED) && fast() },
   { id: 'ground-slow', group: 'crash', level: 'warning', message: 'Ground proximity', active: () => ground() && !fast() },
-  { id: 'collision-slow', group: 'collision', level: 'warning', message: 'Obstacle nearby', active: () => proximity(OBSTACLE_MIN_SPEED) && !fast() },
+  // Voyant PROX allumé (orange ou rouge), quelle que soit la vitesse, sauf posé ou train sorti (hangars, pads) ;
+  // au-dessus de 100 m/s avec PROX rouge, c'est l'alerte rouge « Collision imminent » qui part à la place.
+  { id: 'proximity', group: 'collision', level: 'warning', message: 'Proximity warning', active: () => proxLit() && !(proximity(OBSTACLE_MIN_SPEED) && fast()) },
   { id: 'health', group: 'health', level: 'critical', message: 'Critical health', active: lowVital('health') },
   { id: 'thirst', group: 'thirst', level: 'warning', message: 'Dehydrated', active: lowVital('thirst') },
   { id: 'hunger', group: 'hunger', level: 'warning', message: 'Starving', active: lowVital('hunger') },

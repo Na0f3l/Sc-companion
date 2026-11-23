@@ -314,7 +314,7 @@ const role = computed(() => {
 
 .side {
   display: grid;
-  align-content: start;
+  grid-template-rows: auto 1fr; // Pilot prend la hauteur restante : la colonne s'aligne sur Flight / Propulsion
   gap: 14px;
   min-width: 0;
 }
@@ -322,7 +322,7 @@ const role = computed(() => {
 // Écran pilote le plus court possible : contenu tassé en haut (pas réparti sur la hauteur de la rangée),
 // écarts minimaux. :deep(.body) = le contenu de MfdPanel.
 .crew :deep(.body) {
-  align-content: start;
+  align-content: center; // contenu centré dans la hauteur disponible
   gap: 16px; // un peu d'air entre les jauges et la ligne coeur / O2 / siège
 }
 

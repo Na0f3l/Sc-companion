@@ -6,7 +6,7 @@ import { reactive, watch } from 'vue'
 export const ALERT_GROUPS = [
   { key: 'hit', label: 'Hit flash' },
   { key: 'crash', label: 'Crash / ground proximity' },
-  { key: 'collision', label: 'Collision / obstacle' },
+  { key: 'collision', label: 'Collision / proximity' },
   { key: 'components', label: 'Component damaged' },
   { key: 'radarLock', label: 'Radar lock' },
   { key: 'missile', label: 'Missile lock / launch' },
