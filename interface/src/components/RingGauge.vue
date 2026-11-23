@@ -15,7 +15,9 @@ const props = withDefaults(
   { alert: 'low', warnAt: undefined, critAt: undefined },
 )
 
-const pct = computed(() => Math.round(Math.min(1, Math.max(0, props.value)) * 100))
+// Arrondi vers le bas, comme le jeu (82,86 → 82 en jeu, pas 83). Le 1e-6 évite qu'une valeur
+// exacte mal représentée en flottant (0,82 × 100 = 81,999…) tombe à l'entier du dessous.
+const pct = computed(() => Math.floor(Math.min(1, Math.max(0, props.value)) * 100 + 1e-6))
 const dash = computed(() => `${pct.value} 100`)
 const level = computed(() => {
   const v = props.value
