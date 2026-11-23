@@ -7,7 +7,7 @@
 // Si plusieurs se déclenchent en même temps, elles passent l'une après l'autre.
 // Une alerte qui reste vraie ne se réaffiche pas ; si elle redevient fausse puis vraie, oui.
 import { computed, ref, watch } from 'vue'
-import { ACT, VEH, has, num, str } from './telemetry'
+import { ACT, FLI, NO_VALUE, VEH, bool, has, num, str } from './telemetry'
 import { playAlert } from './sound'
 
 export type AlertLevel = 'critical' | 'warning'
@@ -42,8 +42,54 @@ function lowVital(name: string, on = 0.25, off = 0.3): () => boolean {
   }
 }
 
+// ---- Vol ----
+const gearDown = () => /DEPLOY/.test(str(`${VEH}flight.state.gear`)) // sorti ou en cours de sortie
+
+/**
+ * Temps avant impact au sol (s), ou null si non calculable.
+ * altitude radar (hauteur sous le vaisseau) ÷ vitesse de descente.
+ * La vitesse verticale est négative en descente (vérifié sur capture).
+ * L'altitude radar vaut 3,4e38 hors de portée : pas de prédiction possible.
+ */
+export function timeToImpact(): number | null {
+  const altKey = `${FLI}radar_altitude`
+  if (!has(altKey)) return null
+  const alt = num(altKey)
+  const vsi = num(`${FLI}vertical_speed_indicator`) // absent = 0
+  if (alt > NO_VALUE || vsi >= 0) return null
+  return alt / -vsi
+}
+
+/**
+ * Crash imminent : impact au sol prévu dans moins de 10 s.
+ * - descente d'au moins 5 m/s (en dessous, c'est une approche, pas une chute) ;
+ * - train sorti = atterrissage voulu : seuil beaucoup plus strict (impact < 3 s à plus de 10 m/s,
+ *   c'est-à-dire un posé violent), pour ne pas sonner à chaque atterrissage ;
+ * - hystérésis : l'alerte retombe quand l'impact n'est plus prévu avant 12 s.
+ */
+function groundImpact(): () => boolean {
+  let on = false
+  return () => {
+    const tti = timeToImpact()
+    const sink = -num(`${FLI}vertical_speed_indicator`)
+    if (tti === null || bool(`${VEH}flight.state.is_landed`)) return (on = false)
+    const [limit, minSink] = gearDown() ? [3, 10] : [10, 5]
+    on = on ? tti < limit + 2 && sink > minSink / 2 : tti < limit && sink > minSink
+    return on
+  }
+}
+
+/**
+ * Collision : voyant PROX du vaisseau au rouge, sauf en manœuvre de décollage / atterrissage
+ * (train sorti ou moins de 30 m/s), où il s'allume normalement près du sol et des hangars.
+ */
+const proximity = () =>
+  str(`${VEH}annunciators.prox`) === 'ANNUNCIATOR_STATE_MAJOR_ON' && !gearDown() && num(`${FLI}speed`) >= 30
+
 const RULES: AlertRule[] = [
   { id: 'test', level: 'critical', message: 'Crash imminent', active: () => testAlert.value },
+  { id: 'ground', level: 'critical', message: 'Crash imminent', active: groundImpact() },
+  { id: 'collision', level: 'critical', message: 'Collision imminente', active: proximity },
   { id: 'health', level: 'critical', message: 'Santé critique', active: lowVital('health') },
   { id: 'thirst', level: 'warning', message: 'Déshydratation', active: lowVital('thirst') },
   { id: 'hunger', level: 'warning', message: 'Sous-alimentation', active: lowVital('hunger') },

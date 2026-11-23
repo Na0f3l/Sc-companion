@@ -9,6 +9,7 @@ import HeadingTape from '@/components/HeadingTape.vue'
 import Annunciators from '@/components/Annunciators.vue'
 import VitalRings from '@/components/VitalRings.vue'
 import GMeter from '@/components/GMeter.vue'
+import { timeToImpact } from '@/alerts'
 
 const fr = new Intl.NumberFormat('fr-FR')
 
@@ -17,6 +18,7 @@ const alt = computed(() => {
   const a = num(`${FLI}radar_altitude`, NO_VALUE * 2)
   return a > NO_VALUE ? null : a
 })
+const tti = computed(timeToImpact)
 const gMax = computed(() => num(`${FLI}g_meter.max`, 1) || 1)
 const gCur = computed(() => num(`${FLI}g_meter.current`))
 
@@ -85,6 +87,14 @@ const role = computed(() => {
         <div class="stack">
           <span class="lbl">Vit. vert.</span>
           <span class="num mid">{{ num(FLI + 'vertical_speed_indicator').toFixed(1) }}<span class="unit">m/s</span></span>
+        </div>
+        <!-- temps avant impact au sol, affiché seulement en descente sous 30 s -->
+        <div class="stack">
+          <span class="lbl">Impact</span>
+          <span class="num mid" :class="{ danger: tti !== null && tti < 10 }">
+            <template v-if="tti !== null && tti < 30">{{ tti.toFixed(0) }}<span class="unit">s</span></template>
+            <template v-else>—</template>
+          </span>
         </div>
       </div>
     </MfdPanel>
@@ -171,6 +181,10 @@ const role = computed(() => {
 </template>
 
 <style scoped lang="scss">
+.danger {
+  color: var(--red);
+}
+
 .cms {
   display: grid;
   grid-template-columns: 1fr 1fr;
