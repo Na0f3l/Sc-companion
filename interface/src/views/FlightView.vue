@@ -64,12 +64,13 @@ const countermeasures = computed(() => {
 // ---- États du vaisseau, abrégés comme sur le HUD du jeu (affichés seulement quand actifs) ----
 // seul « active » compte : « enabled » veut dire disponible (vérifié sur capture : ESP enabled mais inactif)
 const ifcsOn = (k: string) => bool(`${VEH}flight.settings.${k}.active`)
+// LIM (ifcs_speed_limiter) écarté : « actif » dans les mêmes trames que CPLD sur capture, donc il suit
+// le mode couplé et pas l'usage réel du limiteur.
 const FLAGS: [label: string, on: () => boolean, title: string][] = [
   ['CPLD', () => ifcsOn('ifcs_coupled'), 'Coupled'],
   ['ESP', () => ifcsOn('ifcs_esp'), 'Enhanced stick precision'],
   ['LIGHT', () => bool(VEH + 'lights_enabled'), 'Lights'],
   ['CRUISE', () => ifcsOn('ifcs_cruise_mode'), 'Cruise control'],
-  ['LIM', () => ifcsOn('ifcs_speed_limiter'), 'Speed limiter'],
 ]
 const flags = computed(() => FLAGS.filter(([, on]) => on()))
 
@@ -90,9 +91,6 @@ const role = computed(() => {
       <!-- comme le HUD du jeu : états du vaisseau à gauche, vitesse / boost au centre, leurres à droite -->
       <div class="top">
         <div class="hud">
-          <span v-if="mode" class="badge" :class="mode.label.toLowerCase()" :title="mode.guessed ? 'Deduced from the quantum drive indicator' : ''">
-            {{ mode.label }}
-          </span>
           <svg
             v-if="gear && gear !== 'RETRACTED'"
             viewBox="0 0 24 24"
@@ -108,22 +106,28 @@ const role = computed(() => {
           </svg>
           <span v-for="[label, , title] in flags" :key="label" class="flag" :title="title">{{ label }}</span>
         </div>
-        <div class="pair">
-          <VBar
-            :value="Math.abs(speed) / SPEED_MAX"
-            :zones="SPEED_ZONES"
-            :reverse="speed < 0"
-            :reading="Math.round(Math.abs(speed)).toString()"
-            label="m/s"
-          />
-          <VBar
-            :value="num(FLI + 'boost.reserves')"
-            :zones="BOOST_ZONES"
-            :reading="`${Math.round(num(FLI + 'boost.reserves') * 100)}%`"
-            label="Boost"
-          >
-            <span class="chip" :class="{ hot: bool(FLI + 'boost.engaged') }">AB</span>
-          </VBar>
+        <!-- mode de vol à part : centré au-dessus des deux barres (place gardée quand il est absent) -->
+        <div class="speed">
+          <span class="badge" :class="[mode?.label.toLowerCase(), { masked: !mode }]" :title="mode?.guessed ? 'Deduced from the quantum drive indicator' : ''">
+            {{ mode?.label ?? 'SCM' }}
+          </span>
+          <div class="pair">
+            <VBar
+              :value="Math.abs(speed) / SPEED_MAX"
+              :zones="SPEED_ZONES"
+              :reverse="speed < 0"
+              :reading="Math.round(Math.abs(speed)).toString()"
+              label="m/s"
+            />
+            <VBar
+              :value="num(FLI + 'boost.reserves')"
+              :zones="BOOST_ZONES"
+              :reading="`${Math.round(num(FLI + 'boost.reserves') * 100)}%`"
+              label="Boost"
+            >
+              <span class="chip" :class="{ hot: bool(FLI + 'boost.engaged') }">AB</span>
+            </VBar>
+          </div>
         </div>
         <!-- leurres restants : le jeu n'envoie que le stock, pas la taille de salve choisie -->
         <div class="cm">
@@ -222,6 +226,12 @@ const role = computed(() => {
   grid-template-columns: 1fr auto 1fr; // vitesse / boost centrés, une colonne de chaque côté
   align-items: center; // états et leurres centrés verticalement sur les barres
   gap: 16px;
+}
+
+.speed {
+  display: grid;
+  justify-items: center;
+  gap: 8px;
 }
 
 .pair {
