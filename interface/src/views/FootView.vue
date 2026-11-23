@@ -83,6 +83,11 @@ const loco = computed(() => LOCO[str(`${ACT}state.locomotion`).replace('ACTOR_LO
       <Sparkline :value="heart" :min="40" :max="160" />
     </MfdPanel>
 
+    <!-- blessures : lues dans le Game.log par le service (pas dans la télémétrie) -->
+    <MfdPanel title="Injuries" source="Game.log" tab="MEDICAL">
+      <BodyInjuries />
+    </MfdPanel>
+
     <MfdPanel class="wide" title="Environment" source="actor.environment" tab="ENVIRONMENT">
       <div class="tiles">
         <HudTile :value="`${gravity.toFixed(2)} G`" label="Gravity">
@@ -110,11 +115,6 @@ const loco = computed(() => LOCO[str(`${ACT}state.locomotion`).replace('ACTOR_LO
         <span><span class="num big">{{ fr.format(Number(str(ACT + 'state.uec_balance', '0'))) }}</span><span class="unit">aUEC</span></span>
       </div>
       <div class="row"><span class="lbl">Movement</span><span class="state">{{ loco }}</span></div>
-    </MfdPanel>
-
-    <!-- blessures : lues dans le Game.log par le service (pas dans la télémétrie) -->
-    <MfdPanel title="Injuries" source="Game.log" tab="MEDICAL">
-      <BodyInjuries />
     </MfdPanel>
   </section>
 </template>
