@@ -1,4 +1,5 @@
-// Lecture du Game.log de Star Citizen : mode de jeu (univers persistant / Arena Commander / menu).
+// Lecture du Game.log de Star Citizen : mode de jeu (univers persistant / Arena Commander / menu)
+// et blessures du personnage.
 //
 // Même règle que l'outil PowerShell (memoire/) :
 //   gamerules="EA_…" ou « Requesting game mode …/EA_… »  → Arena Commander
@@ -18,6 +19,13 @@ const DEFAULT_DIR = 'C:\\Program Files\\Roberts Space Industries\\StarCitizen\\L
 const POLL_MS = 2000
 const MAX_FIRST_READ = 8 * 2 ** 20 // octets lus au plus au démarrage (fin du fichier)
 const MODE_RX = /gamerules="([^"]+)"|Requesting game mode [^/\s"]*\/(\w+)|(<Join PU>)|(<SystemQuit>)/g
+
+// Blessures : notifications du HUD, ex. « Minor Injury Detected - Right leg - Tier 3 Treatment Required ».
+// Tier 3 = mineure, 2 = modérée, 1 = grave. Le jeu ne note PAS la guérison : voir clearInjuries().
+const INJURY_RX = /Injury Detected - (Head|Torso|Left arm|Right arm|Left leg|Right leg) - Tier ([123])/g
+const PART_KEY: Record<string, string> = {
+  Head: 'head', Torso: 'torso', 'Left arm': 'left_arm', 'Right arm': 'right_arm', 'Left leg': 'left_leg', 'Right leg': 'right_leg',
+}
 
 function modeOf(m: RegExpExecArray): GameMode {
   if (m[3]) return 'pu'
@@ -42,6 +50,8 @@ export function createGameLogReader(gameDir = DEFAULT_DIR) {
   let pos = 0
   let rest = '' // fin de ligne incomplète, gardée pour la lecture suivante
   let mode: GameMode | null = null
+  // partie du corps → tier (la dernière notification fait foi) et moment où on l'a lue
+  const injuries = new Map<string, { tier: number; at: number }>()
 
   function readFrom(start: number, end: number): string {
     const fd = fs.openSync(file, 'r') // Node ouvre en lecture partagée : le jeu peut continuer d'écrire
@@ -62,15 +72,18 @@ export function createGameLogReader(gameDir = DEFAULT_DIR) {
       mode = null // pas de Game.log (jeu jamais lancé, autre dossier)
       return
     }
-    if (size < pos) { pos = 0; rest = ''; mode = null } // nouveau fichier (jeu relancé)
+    if (size < pos) { pos = 0; rest = ''; mode = null; injuries.clear() } // nouveau fichier (jeu relancé)
     if (size === pos) return
     if (pos === 0 && size > MAX_FIRST_READ) pos = size - MAX_FIRST_READ // premier passage : la fin suffit
     const text = rest + readFrom(pos, size)
     pos = size
     const cut = text.lastIndexOf('\n')
     rest = cut >= 0 ? text.slice(cut + 1) : text
-    const found = lastMode(cut >= 0 ? text.slice(0, cut) : '')
+    const lines = cut >= 0 ? text.slice(0, cut) : ''
+    const found = lastMode(lines)
     if (found) mode = found
+    INJURY_RX.lastIndex = 0
+    for (let m = INJURY_RX.exec(lines); m; m = INJURY_RX.exec(lines)) injuries.set(PART_KEY[m[1]!]!, { tier: Number(m[2]), at: Date.now() })
   }
 
   return {
@@ -83,6 +96,19 @@ export function createGameLogReader(gameDir = DEFAULT_DIR) {
       if (timer) clearInterval(timer)
       timer = null
     },
-    flat: (): Flat => (mode ? { 'game.mode': mode } : {}),
+    /**
+     * Blessures soignées (le jeu ne l'écrit pas dans le log : décidé par le service, voir index.ts).
+     * Seules celles lues depuis plus de 10 s sont effacées : une blessure toute neuve peut arriver dans le log
+     * un instant avant que la santé max ne baisse dans la télémétrie.
+     */
+    clearInjuries() {
+      const limit = Date.now() - 10_000
+      for (const [part, i] of injuries) if (i.at < limit) injuries.delete(part)
+    },
+    flat: (): Flat => {
+      const out: Flat = mode ? { 'game.mode': mode } : {}
+      for (const [part, i] of injuries) out[`injury.${part}`] = i.tier
+      return out
+    },
   }
 }

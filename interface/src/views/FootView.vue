@@ -9,6 +9,7 @@ import HudTile from '@/components/HudTile.vue'
 import HudIcon from '@/components/HudIcon.vue'
 import ArcMeter from '@/components/ArcMeter.vue'
 import SpectrumDial from '@/components/SpectrumDial.vue'
+import BodyInjuries from '@/components/BodyInjuries.vue'
 
 const fr = new Intl.NumberFormat('en-US')
 const V = `${ACT}vitals.`
@@ -109,6 +110,11 @@ const loco = computed(() => LOCO[str(`${ACT}state.locomotion`).replace('ACTOR_LO
         <span><span class="num big">{{ fr.format(Number(str(ACT + 'state.uec_balance', '0'))) }}</span><span class="unit">aUEC</span></span>
       </div>
       <div class="row"><span class="lbl">Movement</span><span class="state">{{ loco }}</span></div>
+    </MfdPanel>
+
+    <!-- blessures : lues dans le Game.log par le service (pas dans la télémétrie) -->
+    <MfdPanel title="Injuries" source="Game.log" tab="MEDICAL">
+      <BodyInjuries />
     </MfdPanel>
   </section>
 </template>

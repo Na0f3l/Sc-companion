@@ -45,6 +45,10 @@ function tick(): void {
     lastFrame = frame
     frameFlat = frame ? flatten(frame) : {}
   }
+  // Blessures : le log ne note pas la guérison. Une blessure baisse la santé max (ex. 95,16 au lieu de 100) ;
+  // quand la santé max revient à 100, on considère que tout est soigné.
+  const healthMax = frameFlat['actor.vitals.health.max']
+  if (typeof healthMax === 'number' && healthMax >= 99.9) gameLog.clearInjuries()
   const next = { ...frameFlat, ...system.flat(), ...gameLog.flat() }
   const patch = diff(state, next)
   state = next
