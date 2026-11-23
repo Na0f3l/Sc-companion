@@ -7,6 +7,7 @@ import SegBar from '@/components/SegBar.vue'
 import VBar, { type Zone } from '@/components/VBar.vue'
 import HeadingTape from '@/components/HeadingTape.vue'
 import Annunciators from '@/components/Annunciators.vue'
+import Diagnostics from '@/components/Diagnostics.vue'
 import VitalRings from '@/components/VitalRings.vue'
 import GMeter from '@/components/GMeter.vue'
 import { impactLeadTime, timeToImpact } from '@/alerts'
@@ -51,19 +52,16 @@ const nearPlanet = computed(() => num(`${FLI}atmospheric_density`) > 0 || alt.va
 const gMax = computed(() => num(`${FLI}g_meter.max`, 1) || 1)
 const gCur = computed(() => num(`${FLI}g_meter.current`))
 
-// ---- Armes : weapons.weapons.0.name, weapons.weapons.1.name… ----
-// "BEHR_LaserCannon_S3_CleanAir_000000000001" → "Laser S3 CleanAir"
-function prettyWeapon(raw: string): string {
-  const parts = raw.replace(/_\d+$/, '').split('_').slice(1)
-  return parts.map((p) => p.replace('LaserCannon', 'Laser').replace('BallisticCannon', 'Balistique')).join(' ')
-}
-const weapons = computed(() => {
-  const list = []
-  for (let i = 0; has(`${WPN}weapons.${i}.name`); i++) {
-    const p = `${WPN}weapons.${i}.`
-    list.push({ name: prettyWeapon(str(p + 'name')), ready: bool(p + 'ready_to_fire'), powered: bool(p + 'is_powered') })
-  }
-  return list
+// ---- Armes : weapons.weapons.0.name, weapons.weapons.1.name… (détail dans Diagnostics) ----
+const weaponsCount = computed(() => {
+  let i = 0
+  while (has(`${WPN}weapons.${i}.name`)) i++
+  return i
+})
+const weaponsReady = computed(() => {
+  let n = 0
+  for (let i = 0; i < weaponsCount.value; i++) if (bool(`${WPN}weapons.${i}.ready_to_fire`)) n++
+  return n
 })
 const countermeasures = computed(() => {
   const out = { DECOY: 0, NOISE: 0 } as Record<string, number>
@@ -73,11 +71,7 @@ const countermeasures = computed(() => {
   return out
 })
 
-// ---- Systèmes ----
-const POWER = [
-  ['powerplants', 'Power plant'], ['engines', 'Engines'], ['weapons', 'Weapons'], ['shield_generators', 'Shields'],
-  ['coolers', 'Coolers'], ['life_support', 'Life support'], ['sensors', 'Sensors'],
-] as const
+// ---- Systèmes (l'alimentation des composants est dans Diagnostics) ----
 const IFCS = [
   ['ifcs_coupled', 'Coupled'], ['ifcs_stability', 'Stability'], ['ifcs_gravity_compensation', 'Grav. comp.'],
   ['ifcs_proximity_assist', 'Prox. assist'], ['ifcs_esp', 'ESP'], ['ifcs_speed_limiter', 'Limiter'],
@@ -173,12 +167,15 @@ const role = computed(() => {
       <Annunciators />
     </MfdPanel>
 
+    <MfdPanel title="Diagnostics" source="power · annunciators · weapons" tab="DIAGNOSTICS">
+      <Diagnostics />
+    </MfdPanel>
+
+    <!-- le détail des armes est dans Diagnostics ; ici le résumé et les contre-mesures -->
     <MfdPanel title="Armament" source="weapons" tab="WEAPONS">
-      <div class="list">
-        <div v-for="(w, i) in weapons" :key="i">
-          <span>{{ w.name }}</span>
-          <span class="pip" :class="w.ready ? 'on' : w.powered ? 'busy' : ''" />
-        </div>
+      <div class="row">
+        <span class="lbl">Ready</span>
+        <span class="num mid">{{ weaponsReady }}<span class="unit">/ {{ weaponsCount }}</span></span>
       </div>
       <div class="cms">
         <div><span class="lbl">Decoys</span><span class="num mid">{{ countermeasures.DECOY }}</span></div>
@@ -186,7 +183,7 @@ const role = computed(() => {
       </div>
     </MfdPanel>
 
-    <MfdPanel title="Systems" source="power · flight.state" tab="POWER">
+    <MfdPanel title="Systems" source="flight.state · flight.settings" tab="IFCS">
       <div class="cols">
         <div class="stack">
           <span class="lbl">Gear</span>
@@ -195,11 +192,6 @@ const role = computed(() => {
         <div class="stack">
           <span class="lbl">Status</span>
           <span class="state">{{ bool(VEH + 'flight.state.is_landed') ? 'Landed' : 'Airborne' }}</span>
-        </div>
-      </div>
-      <div class="list">
-        <div v-for="[k, label] in POWER" :key="k">
-          <span>{{ label }}</span><span class="pip" :class="{ on: bool(VEH + 'power.' + k) }" />
         </div>
       </div>
       <div class="chips">
