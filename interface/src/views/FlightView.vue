@@ -62,8 +62,8 @@ const countermeasures = computed(() => {
 })
 
 // ---- États du vaisseau, abrégés comme sur le HUD du jeu (affichés seulement quand actifs) ----
-// un réglage est « actif » s'il est actif, ou à défaut activé (certains n'envoient que enabled)
-const ifcsOn = (k: string) => bool(`${VEH}flight.settings.${k}.active`) || bool(`${VEH}flight.settings.${k}.enabled`)
+// seul « active » compte : « enabled » veut dire disponible (vérifié sur capture : ESP enabled mais inactif)
+const ifcsOn = (k: string) => bool(`${VEH}flight.settings.${k}.active`)
 const FLAGS: [label: string, on: () => boolean, title: string][] = [
   ['CPLD', () => ifcsOn('ifcs_coupled'), 'Coupled'],
   ['ESP', () => ifcsOn('ifcs_esp'), 'Enhanced stick precision'],
@@ -220,7 +220,7 @@ const role = computed(() => {
   --vbar-h: 120px; // barres un peu plus courtes : moins de hauteur pour le panneau
   display: grid;
   grid-template-columns: 1fr auto 1fr; // vitesse / boost centrés, une colonne de chaque côté
-  align-items: start;
+  align-items: center; // états et leurres centrés verticalement sur les barres
   gap: 16px;
 }
 
