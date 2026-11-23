@@ -7,6 +7,7 @@ import { soundOn, soundUnlocked, toggleSound } from './sound'
 import FlightView from './views/FlightView.vue'
 import FootView from './views/FootView.vue'
 import AlertOverlay from './components/AlertOverlay.vue'
+import IdleScreen, { type IdleKind } from './components/IdleScreen.vue'
 import MemoryBar from './components/MemoryBar.vue'
 
 onMounted(connect)
@@ -23,11 +24,18 @@ watchEffect(() => {
   document.documentElement.dataset.mode = gameMode.value
 })
 
-const ctx = computed<'vol' | 'pied' | 'attente'>(() => {
-  if (!has(`${ACT}state.locomotion`)) return 'attente'
+// Contexte affiché, du plus « bloquant » au plus précis :
+//  service injoignable → jeu non lancé → menu → chargement → à pied / en vol
+const ctx = computed<'vol' | 'pied' | IdleKind>(() => {
+  if (link.value !== 'online') return 'link'
+  if (!has('sc.private_mb')) return 'offline' // StarCitizen.exe absent (mesuré par le service)
+  if (str('game.mode') === 'menu') return 'menu'
+  if (!has(`${ACT}state.locomotion`)) return 'loading'
   const seated = str(`${ACT}state.locomotion`).endsWith('SEATED')
   return seated && has(`${VEH}class_name`) ? 'vol' : 'pied'
 })
+const IDLE_LABEL: Record<string, string> = { link: 'No link', offline: 'Game not running', menu: 'Main menu', loading: 'Loading' }
+const idle = computed(() => (ctx.value === 'vol' || ctx.value === 'pied' ? null : ctx.value))
 const ship = computed(() => str(`${VEH}class_name`).replaceAll('_', ' '))
 </script>
 
@@ -39,7 +47,7 @@ const ship = computed(() => str(`${VEH}class_name`).replaceAll('_', ' '))
         <span class="dot" :class="{ off: link !== 'online' }" />
         <template v-if="ctx === 'vol'"><b>In flight</b> · {{ ship }}</template>
         <template v-else-if="ctx === 'pied'"><b>On foot</b> · Character</template>
-        <template v-else>Waiting for the game…</template>
+        <template v-else>{{ IDLE_LABEL[ctx] }}</template>
       </div>
       <span v-if="gameMode" class="gmode" :class="gameMode">{{ MODE_LABEL[gameMode] }}</span>
       <div class="feed">{{ link }}<template v-if="source"> · {{ source === 'replay' ? 'capture replay' : 'live game' }}</template></div>
@@ -62,9 +70,7 @@ const ship = computed(() => str(`${VEH}class_name`).replaceAll('_', ' '))
     <Transition name="swap" mode="out-in">
       <FlightView v-if="ctx === 'vol'" />
       <FootView v-else-if="ctx === 'pied'" />
-      <p v-else class="wait">
-        No data yet. The service must be running and the game launched with your character spawned.
-      </p>
+      <IdleScreen v-else-if="idle" :key="idle" :kind="idle" />
     </Transition>
   </main>
 </template>
@@ -172,11 +178,6 @@ const ship = computed(() => str(`${VEH}class_name`).replaceAll('_', ' '))
   }
 }
 
-.wait {
-  max-width: 60ch;
-  color: var(--muted);
-  line-height: 1.6;
-}
 
 .swap-enter-active,
 .swap-leave-active {
