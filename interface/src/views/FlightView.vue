@@ -77,6 +77,14 @@ type Flag = { label: string; title: string; danger?: boolean }
 // Signalé seulement vaisseau alimenté et en mode combat (SCM) : en NAV l'ESP est coupé par le quantum et ne sert à rien.
 // Pas de condition sur « enabled » : ESP coupé en jeu, le jeu passe enabled ET active à faux (vérifié en direct).
 const espLost = () => mode.value?.label !== 'NAV' && bool(VEH + 'power.powerplants') && !ifcsOn('ifcs_esp')
+// Compensateur de gravité : censé être toujours actif → rien quand il l'est, bande rouge quand il est coupé
+// (vaisseau alimenté, tous modes : il compte aussi en NAV près d'une planète).
+const gravLost = () => bool(VEH + 'power.powerplants') && !ifcsOn('ifcs_gravity_compensation')
+// Bandes d'avertissement en bas du panneau de vol
+const warnings = computed(() => [
+  ...(espLost() ? ['Warning · ESP inactive'] : []),
+  ...(gravLost() ? ['Warning · Grav. comp. inactive'] : []),
+])
 const flags = computed(() => {
   const out: Flag[] = []
   if (ifcsOn('ifcs_coupled')) out.push({ label: 'CPLD', title: 'Coupled' })
@@ -177,7 +185,9 @@ const role = computed(() => {
         </div>
       </div>
       <!-- bande d'avertissement collée au bas du panneau, juste au-dessus de l'onglet FLIGHT -->
-      <div v-if="espLost()" class="esp-warn" role="status">Warning · ESP inactive</div>
+      <div v-if="warnings.length" class="warns" role="status">
+        <div v-for="w in warnings" :key="w" class="esp-warn">{{ w }}</div>
+      </div>
     </MfdPanel>
 
     <MfdPanel title="Propulsion" source="fuel · boost · g_meter" tab="PROPULSION">
@@ -314,8 +324,13 @@ const role = computed(() => {
 }
 
 // pleine largeur, collée à l'onglet du bas (annule le padding du panneau)
-.esp-warn {
+.warns {
+  display: grid;
+  gap: 1px;
   margin: auto -14px -12px; // -12px : annule l'écart entre le contenu et l'onglet (MfdPanel)
+}
+
+.esp-warn {
   padding: 6px 14px;
   background: var(--red);
   color: #fff;
