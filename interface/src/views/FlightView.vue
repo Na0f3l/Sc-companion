@@ -201,18 +201,22 @@ const role = computed(() => {
     </MfdPanel>
 
     <MfdPanel title="Pilot" source="actor.vitals" tab="CREW">
-      <VitalRings />
-      <div class="cols">
+      <VitalRings compact />
+      <!-- coeur, O2 et siège sur une seule ligne : le panneau reste court -->
+      <div class="pilot">
         <div class="stack">
           <span class="lbl">Heart</span>
-          <span class="num mid">{{ Math.round(num(ACT + 'vitals.heart_rate')) }}<span class="unit">bpm</span></span>
+          <span class="num">{{ Math.round(num(ACT + 'vitals.heart_rate')) }}<span class="unit">bpm</span></span>
         </div>
         <div class="stack">
           <span class="lbl">Oxygen</span>
-          <span class="num mid">{{ Math.round(num(ACT + 'vitals.oxygen.current') * 100) }}<span class="unit">%</span></span>
+          <span class="num">{{ Math.round(num(ACT + 'vitals.oxygen.current') * 100) }}<span class="unit">%</span></span>
+        </div>
+        <div class="stack">
+          <span class="lbl">Seat</span>
+          <span class="state">{{ role }}</span>
         </div>
       </div>
-      <div class="row"><span class="lbl">Seat</span><span class="state">{{ role }}</span></div>
     </MfdPanel>
 
     <MfdPanel class="wide ghost" title="Hull · shields · quantum" source="vehicle.health · shields · quantum_fuel" tab="DAMAGE">
@@ -234,9 +238,10 @@ const role = computed(() => {
   --mode-h: 22px; // hauteur du badge NAV / SCM au-dessus des barres
   --mode-gap: 8px;
   display: grid;
-  grid-template-columns: 1fr auto 1fr; // vitesse / boost centrés, une colonne de chaque côté
+  // vitesse / boost centrés ; les colonnes latérales ne descendent jamais sous la largeur de leur contenu
+  grid-template-columns: minmax(max-content, 1fr) auto minmax(max-content, 1fr);
   align-items: start;
-  gap: 16px;
+  gap: 10px;
 }
 
 .speed {
@@ -260,7 +265,7 @@ const role = computed(() => {
   gap: 4px;
 
   > * {
-    width: 58px;
+    width: 52px;
   }
 }
 
@@ -270,6 +275,13 @@ const role = computed(() => {
 .cm {
   height: var(--vbar-h);
   margin-top: calc(var(--mode-h) + var(--mode-gap));
+}
+
+// écran pilote : trois valeurs côte à côte
+.pilot {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
 }
 
 // pleine largeur, collée à l'onglet du bas (annule le padding du panneau)
@@ -290,12 +302,12 @@ const role = computed(() => {
   grid-template-columns: auto auto;
   align-content: center;
   justify-content: start;
-  gap: 6px 12px;
+  gap: 6px 8px;
 
   span {
     color: var(--cyan);
-    font: 600 12px var(--font-num);
-    letter-spacing: 0.14em;
+    font: 600 11px var(--font-num);
+    letter-spacing: 0.08em;
     text-transform: uppercase;
   }
 
@@ -317,7 +329,7 @@ const role = computed(() => {
 }
 
 .flag {
-  min-width: 62px;
+  min-width: 54px;
   padding: 2px 6px 2px calc(6px + 0.14em); // compense l'espace ajouté après la dernière lettre
   border: 1px solid var(--cyan-dim);
   border-radius: 3px;

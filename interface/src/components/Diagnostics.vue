@@ -86,6 +86,13 @@ const counts = computed(() => {
   return out
 })
 
+// Ordre d'affichage : ce qui a un souci passe en tête (majeur, puis mineur), le reste garde l'ordre normal.
+const RANK: Record<AnnLevel, number> = { major: 0, minor: 1, nominal: 2, off: 2 }
+const sorted = computed(() => [...CATEGORIES].sort((a, b) => RANK[level(a)] - RANK[level(b)]))
+// Armes : non alimentées puis pas prêtes en tête
+const weaponRank = (w: { powered: boolean; ready: boolean }) => (!w.powered ? 0 : !w.ready ? 1 : 2)
+const sortedWeapons = computed(() => [...weapons.value].sort((a, b) => weaponRank(a) - weaponRank(b)))
+
 // Catégories repliées (le chevron), gardées le temps de la session
 const folded = reactive<Record<string, boolean>>({})
 </script>
@@ -101,8 +108,10 @@ const folded = reactive<Record<string, boolean>>({})
       </span>
     </div>
 
+    <!-- liste qui défile : elle prend la hauteur laissée par les autres panneaux de la rangée -->
+    <div class="scroll">
     <ul class="tree">
-      <li v-for="c in CATEGORIES" :key="c.key" :data-s="level(c)" :class="{ off: !powered(c), flash: flashing(c) }">
+      <li v-for="c in sorted" :key="c.key" :data-s="level(c)" :class="{ off: !powered(c), flash: flashing(c) }">
         <button
           type="button"
           class="cat"
@@ -121,7 +130,7 @@ const folded = reactive<Record<string, boolean>>({})
 
         <!-- Armes : une ligne par arme, sous la catégorie -->
         <ul v-if="c.key === 'weapons' && !folded[c.key]" class="items">
-          <li v-for="(w, i) in weapons" :key="i" :class="{ off: !w.powered }">
+          <li v-for="(w, i) in sortedWeapons" :key="i" :class="{ off: !w.powered }">
             <span class="name">{{ w.maker }} {{ w.type }}</span>
             <span class="size">{{ w.size }}</span>
             <span class="pip" :class="w.ready ? 'on' : w.powered ? 'busy' : ''" :title="w.ready ? 'Ready' : w.powered ? 'Not ready' : 'Unpowered'" />
@@ -129,13 +138,34 @@ const folded = reactive<Record<string, boolean>>({})
         </ul>
       </li>
     </ul>
+    </div>
   </div>
 </template>
 
 <style scoped lang="scss">
 .diag {
   display: grid;
+  grid-template-rows: auto 1fr;
   gap: 8px;
+  height: 100%;
+}
+
+// Le contenu est en absolu : il ne compte pas dans la hauteur du panneau, qui suit donc la rangée.
+// min-height : hauteur minimale quand le panneau est seul sur sa ligne (téléphone).
+.scroll {
+  position: relative;
+  min-height: 240px;
+
+  > .tree {
+    position: absolute;
+    inset: 0;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    align-content: start; // hauteur fixe : les lignes ne doivent pas s'étirer
+    padding-right: 4px;
+    scrollbar-width: thin;
+    scrollbar-color: var(--cyan-dim) transparent;
+  }
 }
 
 .head {
