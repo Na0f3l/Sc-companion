@@ -54,13 +54,9 @@ function beep(freq: number, start: number, dur: number, type: OscillatorType, vo
   osc.stop(t + dur) // l'oscillateur est libéré tout seul après l'arrêt
 }
 
+// Seules les alertes importantes (critical) sonnent ; les secondaires (warning) sont silencieuses.
 export function playAlert(level: 'critical' | 'warning'): void {
-  if (!soundOn.value || !ctx || ctx.state !== 'running') return
-  if (level === 'critical') {
-    // alarme deux tons, 2 fois : aigu / grave / aigu / grave
-    ;[880, 660, 880, 660].forEach((f, i) => beep(f, i * 0.17, 0.15, 'square', 0.06))
-  } else {
-    // deux bips doux
-    ;[740, 740].forEach((f, i) => beep(f, i * 0.22, 0.14, 'triangle', 0.12))
-  }
+  if (level !== 'critical' || !soundOn.value || !ctx || ctx.state !== 'running') return
+  // alarme deux tons, 2 fois : aigu / grave / aigu / grave
+  ;[880, 660, 880, 660].forEach((f, i) => beep(f, i * 0.17, 0.15, 'square', 0.06))
 }

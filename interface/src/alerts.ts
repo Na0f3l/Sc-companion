@@ -86,10 +86,21 @@ function groundImpact(): () => boolean {
 const proximity = () =>
   str(`${VEH}annunciators.prox`) === 'ANNUNCIATOR_STATE_MAJOR_ON' && !gearDown() && num(`${FLI}speed`) >= 30
 
+// Au-dessus de cette vitesse, un crash ou une collision devient une alerte importante (rouge + son)
+const FAST = 100 // m/s
+const fast = () => num(`${FLI}speed`) > FAST
+const ground = groundImpact() // une seule instance : son état (hystérésis) est partagé par les deux niveaux
+
+// Niveaux :
+//  - critical : alerte importante, rouge, avec son
+//  - warning  : alerte secondaire, orange, sans son
+// L'ordre fixe la priorité quand plusieurs alertes arrivent ensemble.
 const RULES: AlertRule[] = [
   { id: 'test', level: 'critical', message: 'Crash imminent', active: () => testAlert.value },
-  { id: 'ground', level: 'critical', message: 'Crash imminent', active: groundImpact() },
-  { id: 'collision', level: 'critical', message: 'Collision imminente', active: proximity },
+  { id: 'ground-fast', level: 'critical', message: 'Crash imminent', active: () => ground() && fast() },
+  { id: 'collision-fast', level: 'critical', message: 'Collision imminente', active: () => proximity() && fast() },
+  { id: 'ground-slow', level: 'warning', message: 'Sol proche', active: () => ground() && !fast() },
+  { id: 'collision-slow', level: 'warning', message: 'Obstacle proche', active: () => proximity() && !fast() },
   { id: 'health', level: 'critical', message: 'Santé critique', active: lowVital('health') },
   { id: 'thirst', level: 'warning', message: 'Déshydratation', active: lowVital('thirst') },
   { id: 'hunger', level: 'warning', message: 'Sous-alimentation', active: lowVital('hunger') },
