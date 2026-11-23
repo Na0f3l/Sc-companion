@@ -68,9 +68,9 @@ const ifcsOn = (k: string) => bool(`${VEH}flight.settings.${k}.active`)
 //  - CRUISE actif : vitesse automatique, dangereuse si on l'oublie (repasser en couplé relance le vaisseau)
 type Flag = { label: string; title: string; danger?: boolean }
 // ESP coupé : ne devrait jamais l'être, mais le jeu le coupe parfois tout seul → bande rouge en bas du panneau.
-// Signalé seulement si l'ESP est disponible (enabled) et le vaisseau alimenté, pour éviter les fausses alertes,
-// et seulement en mode combat (SCM) : en NAV l'ESP est coupé par le quantum et ne sert à rien.
-const espLost = () => mode.value?.label !== 'NAV' && bool(VEH + 'power.powerplants') && bool(`${VEH}flight.settings.ifcs_esp.enabled`) && !ifcsOn('ifcs_esp')
+// Signalé seulement vaisseau alimenté et en mode combat (SCM) : en NAV l'ESP est coupé par le quantum et ne sert à rien.
+// Pas de condition sur « enabled » : ESP coupé en jeu, le jeu passe enabled ET active à faux (vérifié en direct).
+const espLost = () => mode.value?.label !== 'NAV' && bool(VEH + 'power.powerplants') && !ifcsOn('ifcs_esp')
 const flags = computed(() => {
   const out: Flag[] = []
   if (ifcsOn('ifcs_coupled')) out.push({ label: 'CPLD', title: 'Coupled' })
