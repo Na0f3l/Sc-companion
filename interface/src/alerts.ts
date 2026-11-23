@@ -10,7 +10,7 @@
 // Pour les situations « par paliers » (température du corps), on émet aussi des alertes ponctuelles
 // avec pushAlert(), voir plus bas.
 import { computed, ref, shallowRef, watch } from 'vue'
-import { ACT, FLI, NO_VALUE, VEH, bool, has, num, str } from './telemetry'
+import { ACT, FLI, NO_VALUE, VEH, annunciator, bool, has, num, str } from './telemetry'
 import { playAlert } from './sound'
 
 export type AlertLevel = 'critical' | 'warning'
@@ -113,7 +113,7 @@ function groundImpact(): () => boolean {
  * train sorti, ou vitesse sous `minSpeed` (le voyant s'allume normalement près des hangars et des pads).
  */
 const proximity = (minSpeed: number) =>
-  str(`${VEH}annunciators.prox`) === 'ANNUNCIATOR_STATE_MAJOR_ON' && !gearDown() && num(`${FLI}speed`) >= minSpeed
+  annunciator('prox') === 'major' && !gearDown() && num(`${FLI}speed`) >= minSpeed
 // L'alerte orange « obstacle » ne s'affiche qu'au-dessus de cette vitesse : un posé sportif
 // mais maîtrisé (en station notamment) reste silencieux.
 const OBSTACLE_MIN_SPEED = 60 // m/s
@@ -141,7 +141,7 @@ const RULES: AlertRule[] = [
   { id: 'ram-leak', level: 'critical', message: 'RAM leak detected', active: () => str('sc.leak') === 'leak' },
   { id: 'mem-crit', level: 'critical', message: 'Memory critical', active: above('sys.commit_pct', 75, 72) },
   { id: 'mem-high', level: 'warning', message: 'Memory high', active: above('sys.commit_pct', 65, 62) },
-  { id: 'missile', level: 'critical', message: 'Missile lock', active: () => str(`${VEH}annunciators.misl`) === 'ANNUNCIATOR_STATE_MAJOR_ON' },
+  { id: 'missile', level: 'critical', message: 'Missile lock', active: () => annunciator('misl') === 'major' },
 ]
 
 const activeAlerts = computed(() => RULES.filter((r) => r.active()))

@@ -1,7 +1,7 @@
 <script setup lang="ts">
 // Écrans affichés quand le personnage est aux commandes d'un vaisseau.
 import { computed } from 'vue'
-import { ACT, FLI, NO_VALUE, VEH, WPN, bool, has, num, str } from '@/telemetry'
+import { ACT, FLI, NO_VALUE, VEH, WPN, annunciator, bool, has, num, str } from '@/telemetry'
 import MfdPanel from '@/components/MfdPanel.vue'
 import SegBar from '@/components/SegBar.vue'
 import VBar, { type Zone } from '@/components/VBar.vue'
@@ -30,6 +30,17 @@ const SPEED_ZONES: Zone[] = [
   { to: 1, color: '#ff5b4f' },
 ]
 // Boost : les 25 derniers % en rouge (pas de nouveau boost possible), le reste en cyan
+// Mode de vol. Le champ prévu (master_mode) n'est pas envoyé en LIVE 4.10 : on le déduit du voyant
+// QDRV, allumé seulement quand le quantum est disponible, c'est-à-dire en NAV. Si le jeu envoie
+// un jour master_mode, il est utilisé en priorité. Aucun sous-mode (QT, missile, minage) dans le schéma.
+const MODE: Record<string, string> = { NAVIGATION: 'NAV', SCM: 'SCM', STEALTH: 'STEALTH' }
+const mode = computed<{ label: string; guessed: boolean } | null>(() => {
+  const real = str(`${VEH}master_mode.mode`).replace('VEHICLE_MASTER_MODE_', '')
+  if (MODE[real]) return { label: MODE[real], guessed: false }
+  if (!bool(`${VEH}power.powerplants`)) return null // vaisseau éteint
+  return { label: annunciator('qdrv') === 'off' ? 'SCM' : 'NAV', guessed: true }
+})
+
 const BOOST_ZONES: Zone[] = [
   { to: 0.25, color: '#ff5b4f' },
   { to: 1, color: '#63e4dd' },
@@ -89,6 +100,10 @@ const role = computed(() => {
   <section class="screens">
     <MfdPanel title="Flight instruments" source="flight.instruments" tab="FLIGHT">
       <!-- vitesse et boost côte à côte, comme le HUD du jeu -->
+      <!-- mode de vol, en haut à gauche du module vitesse / boost -->
+      <div v-if="mode" class="mode" :title="mode.guessed ? 'Deduced from the quantum drive indicator' : ''">
+        <span class="badge" :class="mode.label.toLowerCase()">{{ mode.label }}</span>
+      </div>
       <div class="pair">
         <VBar
           :value="Math.abs(speed) / SPEED_MAX"
@@ -219,6 +234,24 @@ const role = computed(() => {
 .masked {
   opacity: 0;
   visibility: hidden;
+}
+
+.mode {
+  margin-bottom: -6px;
+}
+
+.badge {
+  display: inline-block;
+  padding: 2px 8px;
+  border: 1px solid var(--cyan-dim);
+  color: var(--cyan);
+  font: 600 12px var(--font-num);
+  letter-spacing: 0.14em;
+
+  &.nav {
+    border-color: var(--amber);
+    color: var(--amber);
+  }
 }
 
 .pair {

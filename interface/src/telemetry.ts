@@ -26,6 +26,20 @@ export const VEH = 'vehicle.state.'
 export const FLI = 'vehicle.state.flight.instruments.'
 export const WPN = 'weapons.'
 
+// ---- Voyants du vaisseau (annunciators) ----
+// Le jeu a 7 états : non spécifié, normal, éteint, mineur (fixe / clignotant), majeur (fixe / clignotant).
+// Ramenés à 4 niveaux + un indicateur de clignotement.
+export type AnnLevel = 'off' | 'nominal' | 'minor' | 'major'
+const ANN_LEVEL: Record<string, AnnLevel> = {
+  ANNUNCIATOR_STATE_NOMINAL: 'nominal',
+  ANNUNCIATOR_STATE_MINOR_ON: 'minor',
+  ANNUNCIATOR_STATE_MINOR_FLASHING: 'minor',
+  ANNUNCIATOR_STATE_MAJOR_ON: 'major',
+  ANNUNCIATOR_STATE_MAJOR_FLASHING: 'major',
+}
+export const annunciator = (k: string): AnnLevel => ANN_LEVEL[str(`${VEH}annunciators.${k}`)] ?? 'off'
+export const annunciatorFlashing = (k: string): boolean => str(`${VEH}annunciators.${k}`).endsWith('_FLASHING')
+
 // « pas de mesure » envoyé par le jeu (plus grand float 32 bits)
 export const NO_VALUE = 1e30
 

@@ -1,23 +1,17 @@
 <script setup lang="ts">
-// Les 10 voyants d'alerte du vaisseau : éteint / normal / mineur (orange) / majeur (rouge clignotant).
-import { str, VEH } from '@/telemetry'
+// Les 10 voyants d'alerte du vaisseau : éteint / normal / mineur (orange) / majeur (rouge),
+// clignotants quand le jeu les fait clignoter (le rouge clignote toujours).
+import { annunciator, annunciatorFlashing } from '@/telemetry'
 
 const LIST = [
   ['pwr', 'Power'], ['wpn', 'Weapons'], ['thr', 'Thrust'], ['shld', 'Shields'], ['cool', 'Cooling'],
   ['qdrv', 'Quantum'], ['radr', 'Radar'], ['prox', 'Proximity'], ['hit', 'Hit'], ['misl', 'Missile'],
 ] as const
-
-const SHORT: Record<string, string> = {
-  ANNUNCIATOR_STATE_NOMINAL: 'nominal',
-  ANNUNCIATOR_STATE_MINOR_ON: 'minor',
-  ANNUNCIATOR_STATE_MAJOR_ON: 'major',
-}
-const stateOf = (k: string) => SHORT[str(`${VEH}annunciators.${k}`)] ?? 'off'
 </script>
 
 <template>
   <div class="ann">
-    <div v-for="[k, fr] in LIST" :key="k" :data-s="stateOf(k)">
+    <div v-for="[k, fr] in LIST" :key="k" :data-s="annunciator(k)" :class="{ flash: annunciatorFlashing(k) }">
       <b>{{ k.toUpperCase() }}</b>
       <small>{{ fr }}</small>
     </div>
@@ -74,6 +68,10 @@ small {
   color: #fff;
   background: var(--red);
   border-color: var(--red);
+  animation: blink 0.5s steps(2) infinite;
+}
+
+.flash {
   animation: blink 0.5s steps(2) infinite;
 }
 
