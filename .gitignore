@@ -1,0 +1,21 @@
+# --- Données personnelles : ne jamais publier ---
+# Sessions enregistrées (CSV, rapports, incidents, copies du Game.log avec pseudo / infos de compte)
+memoire/tracking/
+# Réglages locaux (positions de fenêtre, dossier du jeu) et journal d'erreurs
+memoire/app/reglages.json
+memoire/app/erreurs.log
+# Captures de télémétrie (solde aUEC, identifiants de vaisseau…)
+telemetrie/captures/
+
+# --- Schéma tiers sans licence (Sokren/sc-telemetry-deck) : à récupérer soi-même, voir README ---
+telemetrie/proto/*.proto
+
+# --- Générés ---
+node_modules/
+memoire/partage/
+
+# --- Système / éditeur ---
+Thumbs.db
+desktop.ini
+.vscode/
+*.log

@@ -1,0 +1,16 @@
+{
+  "name": "sc-companion",
+  "version": "0.0.1",
+  "private": true,
+  "description": "Application compagnon Star Citizen - étape 0 : sonde de connexion à la télémétrie gRPC locale",
+  "type": "module",
+  "engines": { "node": ">=22" },
+  "scripts": {
+    "probe": "node tools/probe.mjs",
+    "fake": "node tools/fake-server.mjs"
+  },
+  "dependencies": {
+    "@grpc/grpc-js": "^1.14.0",
+    "@grpc/proto-loader": "^0.8.0"
+  }
+}
