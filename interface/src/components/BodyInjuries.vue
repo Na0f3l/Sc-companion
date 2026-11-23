@@ -14,13 +14,14 @@ interface Part {
   ty: number
 }
 
+// Jambes écartées et bras décollés du corps : chaque partie se lit séparément (grille 120 × 200)
 const PARTS: Part[] = [
-  { key: 'head', label: 'Head', d: 'M50 6a10 12 0 1 1 0 24a10 12 0 1 1 0-24z', line: [40, 18, 22, 18], tx: 16, ty: 18 },
-  { key: 'torso', label: 'Torso', d: 'M37 34h26l3 58H34z', line: [36, 62, 14, 62], tx: 8, ty: 62 },
-  { key: 'right_arm', label: 'Right arm', d: 'M33 36l-8 4-6 56 6 2 7-46z', line: [21, 86, 9, 98], tx: 5, ty: 106 },
-  { key: 'left_arm', label: 'Left arm', d: 'M67 36l8 4 6 56-6 2-7-46z', line: [79, 86, 91, 98], tx: 95, ty: 106 },
-  { key: 'right_leg', label: 'Right leg', d: 'M35 96h14l-2 90h-8z', line: [38, 150, 20, 150], tx: 14, ty: 150 },
-  { key: 'left_leg', label: 'Left leg', d: 'M51 96h14l-4 90h-8z', line: [62, 150, 80, 150], tx: 86, ty: 150 },
+  { key: 'head', label: 'Head', d: 'M60 5a11 13 0 1 1 0 26a11 13 0 1 1 0-26z', line: [49, 18, 30, 18], tx: 24, ty: 18 },
+  { key: 'torso', label: 'Torso', d: 'M46 36h28l3 60H43z', line: [47, 46, 30, 34], tx: 24, ty: 30 },
+  { key: 'right_arm', label: 'Right arm', d: 'M44 38l-9 4-9 54 6 2 10-44z', line: [28, 90, 14, 104], tx: 9, ty: 111 },
+  { key: 'left_arm', label: 'Left arm', d: 'M76 38l9 4 9 54-6 2-10-44z', line: [92, 90, 106, 104], tx: 111, ty: 111 },
+  { key: 'right_leg', label: 'Right leg', d: 'M44 100h14l-19 96h-9z', line: [37, 160, 18, 160], tx: 11, ty: 160 },
+  { key: 'left_leg', label: 'Left leg', d: 'M62 100h14l14 96h-9z', line: [83, 160, 102, 160], tx: 109, ty: 160 },
 ]
 
 const tier = (p: Part): number | null => (has(`injury.${p.key}`) ? num(`injury.${p.key}`) : null)
@@ -30,7 +31,7 @@ const TIER_NAME: Record<number, string> = { 1: 'Severe', 2: 'Moderate', 3: 'Mino
 
 <template>
   <div class="body">
-    <svg viewBox="-4 0 108 196" role="img" aria-label="Injuries">
+    <svg viewBox="0 0 120 200" role="img" aria-label="Injuries">
       <g v-for="p in PARTS" :key="p.key" :class="tier(p) ? `t${tier(p)}` : ''">
         <path :d="p.d" class="part" />
         <template v-if="tier(p)">
@@ -51,14 +52,16 @@ const TIER_NAME: Record<number, string> = { 1: 'Severe', 2: 'Moderate', 3: 'Mino
 <style scoped lang="scss">
 .body {
   display: grid;
-  grid-template-columns: auto 1fr;
-  align-items: center;
-  gap: 14px;
+  justify-items: center;
+  align-content: center; // centré dans la hauteur du panneau
+  gap: 12px;
+  height: 100%;
 }
 
 svg {
-  width: 92px;
-  height: auto;
+  width: auto;
+  height: 230px;
+  max-width: 100%;
   overflow: visible;
 }
 
@@ -101,7 +104,7 @@ svg {
 
   li {
     display: flex;
-    justify-content: space-between;
+    justify-content: center;
     align-items: baseline;
     gap: 8px;
     font-size: 13px;
