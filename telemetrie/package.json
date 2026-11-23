@@ -7,7 +7,8 @@
   "engines": { "node": ">=22" },
   "scripts": {
     "probe": "node tools/probe.mjs",
-    "fake": "node tools/fake-server.mjs"
+    "fake": "node tools/fake-server.mjs",
+    "raw": "node tools/raw-capture.mjs"
   },
   "dependencies": {
     "@grpc/grpc-js": "^1.14.0",

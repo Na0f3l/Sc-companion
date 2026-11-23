@@ -8,6 +8,7 @@ import SpeedGauge from '@/components/SpeedGauge.vue'
 import HeadingTape from '@/components/HeadingTape.vue'
 import Annunciators from '@/components/Annunciators.vue'
 import VitalRings from '@/components/VitalRings.vue'
+import GMeter from '@/components/GMeter.vue'
 
 const fr = new Intl.NumberFormat('fr-FR')
 
@@ -100,12 +101,8 @@ const role = computed(() => {
           <SegBar :value="num(FLI + 'boost.reserves')" :segments="12" vertical />
           <span class="lbl">Boost</span>
         </div>
-        <div class="bar">
-          <span class="num">{{ gCur.toFixed(1) }}</span>
-          <SegBar :value="gCur / gMax" :segments="12" vertical alert="high" />
-          <span class="lbl">Charge G</span>
-        </div>
       </div>
+      <GMeter :g="gCur" :limit="gMax" :speed="num(FLI + 'speed')" />
       <div class="row"><span class="lbl">Limite G</span><span class="num">{{ gMax.toFixed(1) }} G</span></div>
       <div class="row">
         <span class="lbl">Postcombustion</span>
