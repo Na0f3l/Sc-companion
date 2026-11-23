@@ -51,6 +51,6 @@ circle {
   inset: 22%;
   display: grid;
   place-items: center;
-  color: var(--text);
+  color: inherit; // prend la couleur d'état de la tuile
 }
 </style>

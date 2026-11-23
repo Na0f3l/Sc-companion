@@ -29,6 +29,22 @@ const hPa = computed(() => num(V + 'pressure') * 1013.25) // le jeu envoie des a
 const extTemp = computed(() => num(E + 'external_temperature'))
 const radiation = computed(() => num(E + 'ambient_radiation_rate'))
 
+type Tone = 'ok' | 'good' | 'warn' | 'crit'
+// Température extérieure : orange au-delà de 100 °C ou en dessous de -75 °C, rouge au-delà de 150 °C ou sous -120 °C
+const extTone = computed<Tone>(() => {
+  const t = extTemp.value
+  if (t > 150 || t < -120) return 'crit'
+  if (t > 100 || t < -75) return 'warn'
+  return 'ok'
+})
+// Température du corps : mêmes seuils que les alertes (alerts.ts)
+const bodyTone = computed<Tone>(() => {
+  const t = bodyTemp.value
+  if (t > 40 || t < 34) return 'crit'
+  if (t > 39 || t < 35) return 'warn'
+  return 'ok'
+})
+
 const LOCO: Record<string, string> = { ON_FOOT: 'On foot', SEATED: 'Seated' }
 const loco = computed(() => LOCO[str(`${ACT}state.locomotion`).replace('ACTOR_LOCOMOTION_STATE_', '')] ?? '—')
 </script>
@@ -38,7 +54,7 @@ const loco = computed(() => LOCO[str(`${ACT}state.locomotion`).replace('ACTOR_LO
     <MfdPanel class="wide" title="Health" source="actor.vitals" tab="HEALTH">
       <VitalRings />
       <div class="tiles">
-        <HudTile :value="`${Math.round(bodyTemp)} °C`" label="Body temp" :tone="bodyTemp > 38.5 || bodyTemp < 35 ? 'warn' : 'ok'">
+        <HudTile :value="`${bodyTemp.toFixed(1)} °C`" label="Body temp" :tone="bodyTone">
           <HudIcon name="body-temp" />
         </HudTile>
         <HudTile :value="`${Math.round(heart)} bpm`" label="Heart rate" :tone="heart > 150 ? 'warn' : 'ok'">
@@ -65,8 +81,9 @@ const loco = computed(() => LOCO[str(`${ACT}state.locomotion`).replace('ACTOR_LO
         <HudTile :value="`${Math.round(hPa)} hPa`" label="Pressure">
           <SpectrumDial :value="hPa / 2026"><HudIcon name="pressure" /></SpectrumDial>
         </HudTile>
-        <HudTile :value="`${Math.round(extTemp)} °C`" label="Temperature">
-          <SpectrumDial :value="(extTemp + 60) / 160"><HudIcon name="ext-temp" /></SpectrumDial>
+        <HudTile :value="`${Math.round(extTemp)} °C`" label="Temperature" :tone="extTone">
+          <!-- échelle du cadran : -150 °C (bas, bleu) → +200 °C (haut, rouge) -->
+          <SpectrumDial :value="(extTemp + 150) / 350"><HudIcon name="ext-temp" /></SpectrumDial>
         </HudTile>
         <HudTile :value="`${radiation.toFixed(radiation < 10 ? 1 : 0)} R/s`" label="Radiation" :tone="radiation > 0 ? 'warn' : 'ok'">
           <SpectrumDial :value="radiation / 5"><HudIcon name="radiation" /></SpectrumDial>

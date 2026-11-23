@@ -6,16 +6,22 @@
 // Aucune interaction : quand une condition DEVIENT vraie, l'alerte s'affiche 1,5 s puis disparaît seule.
 // Si plusieurs se déclenchent en même temps, elles passent l'une après l'autre.
 // Une alerte qui reste vraie ne se réaffiche pas ; si elle redevient fausse puis vraie, oui.
-import { computed, ref, watch } from 'vue'
+//
+// Pour les situations « par paliers » (température du corps), on émet aussi des alertes ponctuelles
+// avec pushAlert(), voir plus bas.
+import { computed, ref, shallowRef, watch } from 'vue'
 import { ACT, FLI, NO_VALUE, VEH, bool, has, num, str } from './telemetry'
 import { playAlert } from './sound'
 
 export type AlertLevel = 'critical' | 'warning'
 
-export interface AlertRule {
+export interface AlertItem {
   id: string
   level: AlertLevel
   message: string
+}
+
+export interface AlertRule extends AlertItem {
   active: () => boolean
 }
 
@@ -111,9 +117,15 @@ const RULES: AlertRule[] = [
 const activeAlerts = computed(() => RULES.filter((r) => r.active()))
 
 // ---- File d'affichage ----
-const queue: AlertRule[] = []
-/** Alerte affichée en ce moment (null = rien). */
-export const shownAlert = ref<AlertRule | null>(null)
+const queue: AlertItem[] = []
+/** Alerte affichée en ce moment (null = rien). shallowRef : on garde l'objet tel quel (comparaisons par identité). */
+export const shownAlert = shallowRef<AlertItem | null>(null)
+
+/** Alerte ponctuelle : affichée une fois (après celles déjà en attente). */
+export function pushAlert(item: AlertItem): void {
+  queue.push(item)
+  if (!shownAlert.value) showNext()
+}
 
 function showNext(): void {
   shownAlert.value = queue.shift() ?? null
@@ -133,6 +145,44 @@ watch(
     if (!shownAlert.value) showNext()
   },
   { immediate: true },
+)
+
+// ---- Température du corps : alertes par paliers ------------------------------------
+//
+// Chaud : 39 °C franchi en montant → orange ; puis 40, 41, 42… → rouge à chaque degré entier franchi.
+// Froid : 35 °C franchi en descendant → orange ; puis 34, 33, 32… → rouge.
+// Seule l'aggravation alerte : revenir de 42 à 41 ne déclenche rien.
+// Un palier se « réarme » quand on est repassé 0,5 °C du bon côté (évite les alertes en boucle
+// quand la valeur oscille autour d'un entier) : 42 → 41,4 → 42 réalerte, 42 → 41,8 → 42 non.
+const HOT_WARN = 39
+const HOT_CRIT = 40
+const COLD_WARN = 35
+const COLD_CRIT = 34
+let hotDone = -Infinity // plus haut palier chaud déjà signalé
+let coldDone = Infinity // plus bas palier froid déjà signalé
+
+watch(
+  () => (has(`${ACT}vitals.body_temperature.current`) ? num(`${ACT}vitals.body_temperature.current`) : null),
+  (t) => {
+    if (t === null) return
+    // réarmement des paliers dépassés dans le bon sens
+    hotDone = Math.min(hotDone, Math.floor(t + 0.5))
+    coldDone = Math.max(coldDone, Math.ceil(t - 0.5))
+
+    const hot = Math.ceil(t) - 1 // plus haut entier strictement dépassé
+    if (hot >= HOT_WARN && hot > hotDone) {
+      hotDone = hot
+      const crit = hot >= HOT_CRIT
+      pushAlert({ id: `body-hot-${hot}`, level: crit ? 'critical' : 'warning', message: `${crit ? 'Hyperthermia' : 'Body temp high'} · ${hot}°C` })
+    }
+
+    const cold = Math.floor(t) + 1 // plus bas entier strictement passé en dessous
+    if (cold <= COLD_WARN && cold < coldDone) {
+      coldDone = cold
+      const crit = cold <= COLD_CRIT
+      pushAlert({ id: `body-cold-${cold}`, level: crit ? 'critical' : 'warning', message: `${crit ? 'Hypothermia' : 'Body temp low'} · ${cold}°C` })
+    }
+  },
 )
 
 /** Teinte de toute l'interface pendant l'affichage d'une alerte. */

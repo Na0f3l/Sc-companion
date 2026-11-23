@@ -50,6 +50,6 @@ const angle = computed(() => `rotate(${180 - Math.min(1, Math.max(0, props.value
 .icon {
   position: absolute;
   inset: 26%;
-  color: var(--text);
+  color: inherit; // prend la couleur d'état de la tuile
 }
 </style>

@@ -46,15 +46,16 @@ withDefaults(defineProps<{ value: string; label: string; tone?: 'ok' | 'good' | 
   text-align: center;
 }
 
-.is-good .val {
+// L'état colore la valeur ET le picto (le visuel utilise currentColor)
+.is-good :is(.val, .visual) {
   color: #57e389;
 }
 
-.is-warn .val {
+.is-warn :is(.val, .visual) {
   color: var(--amber);
 }
 
-.is-crit .val {
+.is-crit :is(.val, .visual) {
   color: var(--red);
 }
 </style>
