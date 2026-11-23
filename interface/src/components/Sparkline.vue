@@ -1,23 +1,30 @@
 <script setup lang="ts">
-// Mini-courbe des dernières valeurs. Historique de taille fixe : la mémoire ne grossit jamais.
-import { computed, ref, watch } from 'vue'
+// Mini-courbe : un point par seconde, sur les `size` dernières secondes (120 = 2 min).
+// Échantillonnage à intervalle fixe pour que l'axe horizontal soit du temps, même si la valeur ne bouge pas.
+// Historique de taille fixe : la mémoire ne grossit jamais.
+import { computed, onMounted, onUnmounted, shallowRef } from 'vue'
 
 const props = withDefaults(defineProps<{ value: number; min: number; max: number; size?: number }>(), { size: 120 })
 
-const hist = ref<number[]>([])
-watch(
-  () => props.value,
-  (v) => {
-    hist.value.push(v)
-    if (hist.value.length > props.size) hist.value.shift()
-  },
-  { immediate: true },
-)
+// shallowRef + nouveau tableau à chaque point : Vue n'observe pas chaque case, juste le remplacement.
+const hist = shallowRef<number[]>([])
+let timer = 0
+onMounted(() => {
+  const sample = () => {
+    const next = hist.value.length >= props.size ? hist.value.slice(1) : hist.value.slice()
+    next.push(props.value)
+    hist.value = next
+  }
+  sample()
+  timer = window.setInterval(sample, 1000)
+})
+onUnmounted(() => clearInterval(timer))
 
 const points = computed(() => {
   const span = props.max - props.min
+  const offset = props.size - hist.value.length // les points arrivent par la droite
   return hist.value
-    .map((v, i) => `${i},${(39 - Math.min(1, Math.max(0, (v - props.min) / span)) * 38).toFixed(1)}`)
+    .map((v, i) => `${offset + i},${(39 - Math.min(1, Math.max(0, (v - props.min) / span)) * 38).toFixed(1)}`)
     .join(' ')
 })
 </script>
