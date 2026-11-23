@@ -64,15 +64,22 @@ const countermeasures = computed(() => {
 // ---- États du vaisseau, abrégés comme sur le HUD du jeu (affichés seulement quand actifs) ----
 // seul « active » compte : « enabled » veut dire disponible (vérifié sur capture : ESP enabled mais inactif)
 const ifcsOn = (k: string) => bool(`${VEH}flight.settings.${k}.active`)
-// LIM (ifcs_speed_limiter) écarté : « actif » dans les mêmes trames que CPLD sur capture, donc il suit
-// le mode couplé et pas l'usage réel du limiteur.
-const FLAGS: [label: string, on: () => boolean, title: string][] = [
-  ['CPLD', () => ifcsOn('ifcs_coupled'), 'Coupled'],
-  ['ESP', () => ifcsOn('ifcs_esp'), 'Enhanced stick precision'],
-  ['LIGHT', () => bool(VEH + 'lights_enabled'), 'Lights'],
-  ['CRUISE', () => ifcsOn('ifcs_cruise_mode'), 'Cruise control'],
-]
-const flags = computed(() => FLAGS.filter(([, on]) => on()))
+// danger : pastille rouge pleine, pour ce qu'on ne doit pas oublier
+//  - CRUISE actif : vitesse automatique, dangereuse si on l'oublie (repasser en couplé relance le vaisseau)
+//  - ESP désactivé : ne devrait jamais l'être, mais le jeu le coupe parfois tout seul. Signalé seulement
+//    si l'ESP est disponible (enabled) et le vaisseau alimenté, pour éviter les fausses alertes.
+type Flag = { label: string; title: string; danger?: boolean }
+const espLost = () => bool(VEH + 'power.powerplants') && bool(`${VEH}flight.settings.ifcs_esp.enabled`) && !ifcsOn('ifcs_esp')
+const flags = computed(() => {
+  const out: Flag[] = []
+  if (ifcsOn('ifcs_coupled')) out.push({ label: 'CPLD', title: 'Coupled' })
+  if (ifcsOn('ifcs_esp')) out.push({ label: 'ESP', title: 'Enhanced stick precision' })
+  else if (espLost()) out.push({ label: 'ESP', title: 'ESP is OFF', danger: true })
+  if (bool(VEH + 'lights_enabled')) out.push({ label: 'LIGHT', title: 'Lights' })
+  if (ifcsOn('ifcs_speed_limiter')) out.push({ label: 'LIM', title: 'Speed limiter' })
+  if (ifcsOn('ifcs_cruise_mode')) out.push({ label: 'CRUISE', title: 'Cruise control is ON', danger: true })
+  return out
+})
 
 // Train : icône rouge sorti, orange clignotante en mouvement, rien quand il est rentré (comme en jeu)
 const gear = computed(() => str(`${VEH}flight.state.gear`).replace('VEHICLE_COMPONENT_DEPLOYMENT_STATE_', ''))
@@ -104,7 +111,7 @@ const role = computed(() => {
             <circle cx="8" cy="14" r="4" />
             <circle cx="8" cy="14" r="1.2" />
           </svg>
-          <span v-for="[label, , title] in flags" :key="label" class="flag" :title="title">{{ label }}</span>
+          <span v-for="f in flags" :key="f.label" class="flag" :class="{ danger: f.danger }" :title="f.title">{{ f.label }}</span>
         </div>
         <!-- mode de vol à part : centré au-dessus des deux barres (place gardée quand il est absent) -->
         <div class="speed">
@@ -304,6 +311,13 @@ const role = computed(() => {
   font: 600 12px var(--font-num);
   letter-spacing: 0.14em;
   text-align: center;
+
+  // rouge plein : se voit même en Arena Commander (interface déjà rouge)
+  &.danger {
+    border-color: var(--red);
+    background: var(--red);
+    color: #fff;
+  }
 }
 
 .gear {
