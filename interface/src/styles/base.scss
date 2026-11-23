@@ -20,6 +20,26 @@
   --font-ui: 'Chakra Petch', 'Bahnschrift', 'Segoe UI', sans-serif;
 }
 
+// Alerte critique : toute l'interface vire au rouge. On redéfinit seulement les variables,
+// le navigateur recolore tout d'un coup, sans JavaScript.
+:root[data-alert='critical'] {
+  --cyan: #ff5b4f;
+  --cyan-dim: #8a2d27;
+  --line: #4d1d1a;
+  --off: #2a100e;
+  --text: #ffd8d3;
+  --muted: #b5726b;
+  --panel: #1a0807;
+  --panel-2: #250c0a;
+  --bg: #120403;
+}
+
+:root[data-alert='warning'] {
+  --cyan: #f2c23b;
+  --cyan-dim: #7a6220;
+  --line: #4a3c14;
+}
+
 *,
 *::before,
 *::after {

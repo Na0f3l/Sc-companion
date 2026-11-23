@@ -1,11 +1,18 @@
 <script setup lang="ts">
 // Page principale : choisit les écrans selon le contexte du personnage (à pied / aux commandes).
-import { computed, onMounted } from 'vue'
+import { computed, onMounted, watchEffect } from 'vue'
 import { ACT, VEH, connect, has, link, source, str } from './telemetry'
+import { alertLevel, testAlert } from './alerts'
 import FlightView from './views/FlightView.vue'
 import FootView from './views/FootView.vue'
+import AlertOverlay from './components/AlertOverlay.vue'
 
 onMounted(connect)
+
+// Teinte globale : un attribut sur <html>, les variables CSS font le reste
+watchEffect(() => {
+  document.documentElement.dataset.alert = alertLevel.value ?? ''
+})
 
 const ctx = computed<'vol' | 'pied' | 'attente'>(() => {
   if (!has(`${ACT}state.locomotion`)) return 'attente'
@@ -26,7 +33,12 @@ const ship = computed(() => str(`${VEH}class_name`).replaceAll('_', ' '))
         <template v-else>En attente du jeu…</template>
       </div>
       <div class="feed">{{ link }}<template v-if="source"> · {{ source === 'replay' ? 'rejeu de capture' : 'jeu en direct' }}</template></div>
+      <button type="button" class="test" :class="{ on: testAlert }" @click="testAlert = !testAlert">
+        {{ testAlert ? 'Arrêter le test' : 'Tester l’alerte' }}
+      </button>
     </header>
+
+    <AlertOverlay />
 
     <!-- Transition : l'ancien écran s'efface, le nouveau apparaît (opacity uniquement) -->
     <Transition name="swap" mode="out-in">
@@ -98,6 +110,28 @@ const ship = computed(() => str(`${VEH}class_name`).replaceAll('_', ' '))
   font-size: 12px;
   letter-spacing: 0.06em;
   text-transform: uppercase;
+}
+
+.test {
+  padding: 5px 10px;
+  border: 1px solid var(--line);
+  background: var(--panel);
+  color: var(--muted);
+  font: 500 11px var(--font-ui);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  cursor: pointer;
+
+  &:hover,
+  &.on {
+    border-color: var(--cyan-dim);
+    color: var(--cyan);
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--amber);
+    outline-offset: 2px;
+  }
 }
 
 .wait {
