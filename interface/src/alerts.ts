@@ -12,6 +12,7 @@
 import { computed, shallowRef, watch } from 'vue'
 import { ACT, FLI, NO_VALUE, VEH, annunciator, bool, has, num, str } from './telemetry'
 import { playAlert } from './sound'
+import { type AlertGroup, alertEnabled } from './settings'
 
 export type AlertLevel = 'critical' | 'warning'
 
@@ -22,6 +23,7 @@ export interface AlertItem {
 }
 
 export interface AlertRule extends AlertItem {
+  group: AlertGroup // case du menu qui l'active / la désactive
   active: () => boolean
 }
 
@@ -133,22 +135,23 @@ const ground = groundImpact() // une seule instance : son état (hystérésis) e
 //  - warning  : alerte secondaire, orange, son discret
 // L'ordre fixe la priorité quand plusieurs alertes arrivent ensemble.
 const RULES: AlertRule[] = [
-  { id: 'ground-fast', level: 'critical', message: 'Crash imminent', active: () => ground() && fast() },
-  { id: 'collision-fast', level: 'critical', message: 'Collision imminent', active: () => proximity(OBSTACLE_MIN_SPEED) && fast() },
-  { id: 'ground-slow', level: 'warning', message: 'Ground proximity', active: () => ground() && !fast() },
-  { id: 'collision-slow', level: 'warning', message: 'Obstacle nearby', active: () => proximity(OBSTACLE_MIN_SPEED) && !fast() },
-  { id: 'health', level: 'critical', message: 'Critical health', active: lowVital('health') },
-  { id: 'thirst', level: 'warning', message: 'Dehydrated', active: lowVital('thirst') },
-  { id: 'hunger', level: 'warning', message: 'Starving', active: lowVital('hunger') },
+  { id: 'ground-fast', group: 'crash', level: 'critical', message: 'Crash imminent', active: () => ground() && fast() },
+  { id: 'collision-fast', group: 'collision', level: 'critical', message: 'Collision imminent', active: () => proximity(OBSTACLE_MIN_SPEED) && fast() },
+  { id: 'ground-slow', group: 'crash', level: 'warning', message: 'Ground proximity', active: () => ground() && !fast() },
+  { id: 'collision-slow', group: 'collision', level: 'warning', message: 'Obstacle nearby', active: () => proximity(OBSTACLE_MIN_SPEED) && !fast() },
+  { id: 'health', group: 'health', level: 'critical', message: 'Critical health', active: lowVital('health') },
+  { id: 'thirst', group: 'thirst', level: 'warning', message: 'Dehydrated', active: lowVital('thirst') },
+  { id: 'hunger', group: 'hunger', level: 'warning', message: 'Starving', active: lowVital('hunger') },
   // voyant MISL en rouge : un missile est verrouillé sur le vaisseau
   // Mémoire (mêmes seuils que l'outil PowerShell) : fuite détectée par le service, engagement système
-  { id: 'ram-leak', level: 'critical', message: 'RAM leak detected', active: () => str('sc.leak') === 'leak' },
-  { id: 'mem-crit', level: 'critical', message: 'Memory critical', active: above('sys.commit_pct', 75, 72) },
-  { id: 'mem-high', level: 'warning', message: 'Memory high', active: above('sys.commit_pct', 65, 62) },
-  { id: 'missile', level: 'critical', message: 'Missile lock', active: () => annunciator('misl') === 'major' },
+  { id: 'ram-leak', group: 'ramLeak', level: 'critical', message: 'RAM leak detected', active: () => str('sc.leak') === 'leak' },
+  { id: 'mem-crit', group: 'memory', level: 'critical', message: 'Memory critical', active: above('sys.commit_pct', 75, 72) },
+  { id: 'mem-high', group: 'memory', level: 'warning', message: 'Memory high', active: above('sys.commit_pct', 65, 62) },
+  { id: 'missile', group: 'missile', level: 'critical', message: 'Missile lock', active: () => annunciator('misl') === 'major' },
 ]
 
-const activeAlerts = computed(() => RULES.filter((r) => r.active()))
+// r.active() est appelé même pour une alerte désactivée : les règles à hystérésis gardent leur état à jour
+const activeAlerts = computed(() => RULES.filter((r) => r.active() && alertEnabled(r.group)))
 
 // ---- File d'affichage ----
 const queue: AlertItem[] = []
@@ -207,14 +210,14 @@ watch(
     if (hot >= HOT_WARN && hot > hotDone) {
       hotDone = hot
       const crit = hot >= HOT_CRIT
-      pushAlert({ id: `body-hot-${hot}`, level: crit ? 'critical' : 'warning', message: `${crit ? 'Hyperthermia' : 'Body temp high'} · ${hot}°C` })
+      if (alertEnabled('bodyTemp')) pushAlert({ id: `body-hot-${hot}`, level: crit ? 'critical' : 'warning', message: `${crit ? 'Hyperthermia' : 'Body temp high'} · ${hot}°C` })
     }
 
     const cold = Math.floor(t) + 1 // plus bas entier strictement passé en dessous
     if (cold <= COLD_WARN && cold < coldDone) {
       coldDone = cold
       const crit = cold <= COLD_CRIT
-      pushAlert({ id: `body-cold-${cold}`, level: crit ? 'critical' : 'warning', message: `${crit ? 'Hypothermia' : 'Body temp low'} · ${cold}°C` })
+      if (alertEnabled('bodyTemp')) pushAlert({ id: `body-cold-${cold}`, level: crit ? 'critical' : 'warning', message: `${crit ? 'Hypothermia' : 'Body temp low'} · ${cold}°C` })
     }
   },
 )

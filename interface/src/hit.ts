@@ -11,6 +11,7 @@
 // Sous un feu nourri, au plus un flash toutes les 0,3 s pour qu'il reste visible.
 import { watch } from 'vue'
 import { ACT, VEH, annunciator, has, num } from './telemetry'
+import { alertEnabled } from './settings'
 
 const FLASH_MS = 200
 const MIN_GAP_MS = 300
@@ -60,13 +61,18 @@ export function flash(): void {
   )
 }
 
+// Dégâts détectés : flash seulement si l'alerte est activée dans le menu (le test, lui, passe toujours)
+function onHit(): void {
+  if (alertEnabled('hit')) flash()
+}
+
 // Valeur numérique qui baisse d'au moins `min` → flash. Absente = rien (le jeu ne l'envoie pas,
 // ou on change de contexte : pas de faux flash en sortant d'un vaisseau ou au chargement).
 function onDrop(key: string, min: number): void {
   watch(
     () => (has(key) ? num(key) : null),
     (now, before) => {
-      if (now !== null && before !== null && before !== undefined && before - now >= min) flash()
+      if (now !== null && before !== null && before !== undefined && before - now >= min) onHit()
     },
   )
 }
@@ -79,6 +85,6 @@ const RANK = { off: 0, nominal: 0, minor: 1, major: 2 } as const
 watch(
   () => RANK[annunciator('hit')],
   (now, before) => {
-    if (now > before) flash()
+    if (now > before) onHit()
   },
 )
