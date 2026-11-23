@@ -38,6 +38,13 @@ Reçu : santé, faim, soif, température, cardio, O₂, environnement, solde, vi
 
 Prévu par le schéma mais jamais envoyé : Q-Fuel, coque, boucliers, mode de vol, événements, retour de force. Aucun vecteur de déplacement : pas de marche arrière, de dérive ni de G par axe. Vérifiable après une mise à jour du jeu avec `npm run raw` dans `telemetrie/`.
 
+## Crédits
+
+Sons d'alerte (`interface/public/sounds/`) :
+
+- alerte rouge : « warning » de **Lyubomir Ikonomov** ([Freesound 787777](https://freesound.org/s/787777/)), libre d'utilisation ;
+- alerte orange : « Mechanical gas release alert » ([Mixkit](https://mixkit.co/)).
+
 ## Avertissement
 
 Projet personnel, non affilié à Cloud Imperium Games. Le service est en lecture seule : il n'envoie aucune commande au jeu.
