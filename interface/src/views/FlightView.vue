@@ -19,6 +19,9 @@ const alt = computed(() => {
   return a > NO_VALUE ? null : a
 })
 const tti = computed(timeToImpact)
+// Proche d'une planète : dans l'atmosphère (densité > 0) ou sol à portée du radar.
+// Hors de là, cap / altitude / vitesse verticale n'ont pas de sens (le HUD du jeu les masque aussi).
+const nearPlanet = computed(() => num(`${FLI}atmospheric_density`) > 0 || alt.value !== null)
 const gMax = computed(() => num(`${FLI}g_meter.max`, 1) || 1)
 const gCur = computed(() => num(`${FLI}g_meter.current`))
 
@@ -71,8 +74,9 @@ const role = computed(() => {
   <section class="screens">
     <MfdPanel title="Flight instruments" source="flight.instruments" tab="FLIGHT">
       <SpeedGauge :value="num(FLI + 'speed')" />
-      <HeadingTape :heading="num(FLI + 'heading')" />
-      <div class="cols">
+      <!-- .masked : invisible mais garde sa place, donc rien ne bouge quand ça apparaît / disparaît -->
+      <HeadingTape :heading="num(FLI + 'heading')" :class="{ masked: !nearPlanet }" />
+      <div class="cols" :class="{ masked: !nearPlanet }">
         <div class="stack">
           <span class="lbl">Heading</span>
           <span class="num mid">{{ String(Math.round(num(FLI + 'heading')) % 360).padStart(3, '0') }}°</span>
@@ -181,6 +185,19 @@ const role = computed(() => {
 </template>
 
 <style scoped lang="scss">
+// Masqué sans libérer la place (visibility, pas display) ; fondu d'opacité à l'apparition / disparition
+.masked {
+  opacity: 0;
+  visibility: hidden;
+}
+
+.tape,
+.cols {
+  transition:
+    opacity 0.3s,
+    visibility 0.3s;
+}
+
 .danger {
   color: var(--red);
 }
