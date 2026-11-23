@@ -20,6 +20,20 @@
   --font-ui: 'Chakra Petch', 'Bahnschrift', 'Segoe UI', sans-serif;
 }
 
+// Arena Commander : interface en rouge (le bleu reste celui de l'univers persistant).
+// Placé avant les alertes : une alerte (orange / rouge) garde la priorité.
+:root[data-mode='ac'] {
+  --cyan: #ff6f61;
+  --cyan-dim: #8f3a33;
+  --line: #4a201d;
+  --off: #2b1210;
+  --text: #ffe0dc;
+  --muted: #b97b74;
+  --panel: #170908;
+  --panel-2: #210d0b;
+  --bg: #0e0403;
+}
+
 // Alerte critique : toute l'interface vire au rouge. On redéfinit seulement les variables,
 // le navigateur recolore tout d'un coup, sans JavaScript.
 :root[data-alert='critical'] {

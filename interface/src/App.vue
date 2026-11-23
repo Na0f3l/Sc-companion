@@ -16,6 +16,13 @@ watchEffect(() => {
   document.documentElement.dataset.alert = alertLevel.value ?? ''
 })
 
+// Mode de jeu (lu dans le Game.log par le service) : pu, ac ou menu. En AC, l'interface passe au rouge.
+const gameMode = computed(() => str('game.mode'))
+const MODE_LABEL: Record<string, string> = { pu: 'PU', ac: 'Arena Commander', menu: 'Menu' }
+watchEffect(() => {
+  document.documentElement.dataset.mode = gameMode.value
+})
+
 const ctx = computed<'vol' | 'pied' | 'attente'>(() => {
   if (!has(`${ACT}state.locomotion`)) return 'attente'
   const seated = str(`${ACT}state.locomotion`).endsWith('SEATED')
@@ -34,6 +41,7 @@ const ship = computed(() => str(`${VEH}class_name`).replaceAll('_', ' '))
         <template v-else-if="ctx === 'pied'"><b>On foot</b> · Character</template>
         <template v-else>Waiting for the game…</template>
       </div>
+      <span v-if="gameMode" class="gmode" :class="gameMode">{{ MODE_LABEL[gameMode] }}</span>
       <div class="feed">{{ link }}<template v-if="source"> · {{ source === 'replay' ? 'capture replay' : 'live game' }}</template></div>
       <!-- le premier clic sur la page déverrouille l'audio ; ce bouton sert aussi à couper / remettre le son -->
       <button
@@ -112,6 +120,15 @@ const ship = computed(() => str(`${VEH}class_name`).replaceAll('_', ' '))
   &.off {
     background: var(--red);
   }
+}
+
+.gmode {
+  padding: 3px 8px;
+  border: 1px solid var(--cyan-dim);
+  color: var(--cyan);
+  font: 600 11px var(--font-num);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
 }
 
 .feed {

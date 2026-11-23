@@ -12,6 +12,7 @@ import { createReplaySource } from './sources/replay.ts'
 import { createLiveSource } from './sources/live.ts'
 import type { Source } from './sources/source.ts'
 import { createSystemMonitor } from './system.ts'
+import { createGameLogReader } from './gamelog.ts'
 
 const args = process.argv.slice(2)
 const opt = (name: string): string | undefined => {
@@ -26,6 +27,7 @@ const TICK_MS = 200 // 5 envois par seconde au maximum
 const replay = opt('replay')
 const source: Source = replay ? createReplaySource(replay) : createLiveSource(opt('addr'))
 const system = createSystemMonitor() // mémoire SC / système, CPU, GPU, détection de fuite
+const gameLog = createGameLogReader(opt('game-dir')) // mode de jeu (PU / Arena Commander) d'après le Game.log
 
 // ---- Diffusion ------------------------------------------------------------------
 let state: Flat = {} // dernier état envoyé aux écrans
@@ -36,7 +38,7 @@ function tick(): void {
   // Télémétrie du jeu (absente si le jeu ne tourne pas) + mesures système, dans le même état à plat.
   // flatten() arrondit aussi les mesures système à 2 décimales.
   const frame = source.latest()
-  const next = { ...(frame ? flatten(frame) : {}), ...flatten(system.flat()) }
+  const next = { ...(frame ? flatten(frame) : {}), ...flatten(system.flat()), ...gameLog.flat() }
   const patch = diff(state, next)
   state = next
   if (!patch) return
@@ -47,6 +49,7 @@ function tick(): void {
 function onFirstClient(): void {
   source.start()
   system.start()
+  gameLog.start()
   tick()
   timer = setInterval(tick, TICK_MS)
   console.log('Client connected: broadcasting started')
@@ -57,6 +60,7 @@ function onLastClientGone(): void {
   timer = null
   source.stop()
   system.stop()
+  gameLog.stop()
   state = {}
   console.log('No clients left: broadcasting paused')
 }
