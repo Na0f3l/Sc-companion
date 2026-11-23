@@ -131,8 +131,8 @@ const role = computed(() => {
         </div>
         <!-- leurres restants : le jeu n'envoie que le stock, pas la taille de salve choisie -->
         <div class="cm">
-          <div><span>Decoy</span><b>{{ countermeasures.DECOY }}</b></div>
-          <div><span>Noise</span><b>{{ countermeasures.NOISE }}</b></div>
+          <span>Decoy</span><b>{{ countermeasures.DECOY }}</b>
+          <span>Noise</span><b>{{ countermeasures.NOISE }}</b>
         </div>
       </div>
       <!-- .masked : invisible mais garde sa place, donc rien ne bouge quand ça apparaît / disparaît -->
@@ -222,37 +222,56 @@ const role = computed(() => {
 
 .top {
   --vbar-h: 120px; // barres un peu plus courtes : moins de hauteur pour le panneau
+  --mode-h: 22px; // hauteur du badge NAV / SCM au-dessus des barres
+  --mode-gap: 8px;
   display: grid;
   grid-template-columns: 1fr auto 1fr; // vitesse / boost centrés, une colonne de chaque côté
-  align-items: center; // états et leurres centrés verticalement sur les barres
+  align-items: start;
   gap: 16px;
 }
 
 .speed {
   display: grid;
   justify-items: center;
-  gap: 8px;
+  gap: var(--mode-gap);
+
+  // badge de hauteur fixe : les colonnes latérales savent exactement où commencent les tubes
+  .badge {
+    height: var(--mode-h);
+    line-height: calc(var(--mode-h) - 2px);
+    padding-block: 0;
+  }
 }
 
+// deux barres de même largeur : le milieu du bloc tombe pile entre les deux tubes
+// (sinon « 100% » et la pastille AB élargissent la barre de boost et décalent le centre)
 .pair {
   display: flex;
-  gap: 14px;
+  align-items: flex-start; // pas d'étirement : valeurs et libellés des deux barres sur la même ligne
+  gap: 4px;
+
+  > * {
+    width: 58px;
+  }
 }
 
-// leurres : libellé + stock, comme sur le HUD du jeu
+// États (gauche) et leurres (droite) : même hauteur que les tubes, décalés de la hauteur du badge,
+// contenu centré → centrés verticalement sur les tubes, quels que soient les textes en dessous.
+.hud,
+.cm {
+  height: var(--vbar-h);
+  margin-top: calc(var(--mode-h) + var(--mode-gap));
+}
+
+// leurres : libellé + stock, comme sur le HUD du jeu ; grille → libellés et chiffres alignés en colonnes
 .cm {
   display: grid;
-  gap: 4px;
-  padding-top: 2px;
-
-  > div {
-    display: flex;
-    gap: 10px;
-    align-items: baseline;
-  }
+  grid-template-columns: auto auto;
+  align-content: center;
+  justify-content: start;
+  gap: 6px 12px;
 
   span {
-    width: 46px;
     color: var(--cyan);
     font: 600 12px var(--font-num);
     letter-spacing: 0.14em;
@@ -263,25 +282,28 @@ const role = computed(() => {
     @include numeric;
     color: var(--text);
     font-size: 14px;
+    text-align: right;
   }
 }
 
-// colonne d'états : badges encadrés comme sur le HUD du jeu
+// colonne d'états : badges encadrés comme sur le HUD du jeu, tous de la même largeur
 .hud {
   display: flex;
   flex-direction: column;
+  justify-content: center;
   align-items: flex-end; // collés à la barre de vitesse
   gap: 6px;
-  padding-top: 2px;
 }
 
 .flag {
-  padding: 2px 7px;
+  min-width: 62px;
+  padding: 2px 6px 2px calc(6px + 0.14em); // compense l'espace ajouté après la dernière lettre
   border: 1px solid var(--cyan-dim);
   border-radius: 3px;
   color: var(--cyan);
   font: 600 12px var(--font-num);
   letter-spacing: 0.14em;
+  text-align: center;
 }
 
 .gear {
@@ -307,7 +329,7 @@ const role = computed(() => {
 
 .badge {
   display: inline-block;
-  padding: 2px 8px;
+  padding: 2px 8px 2px calc(8px + 0.14em); // compense l'espace ajouté après la dernière lettre
   border: 1px solid var(--cyan-dim);
   color: var(--cyan);
   font: 600 12px var(--font-num);
