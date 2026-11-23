@@ -10,7 +10,7 @@
 import { computed, reactive } from 'vue'
 import { VEH, WPN, type AnnLevel, annunciator, annunciatorFlashing, bool, has, str } from '@/telemetry'
 
-type Icon = 'power' | 'engine' | 'weapon' | 'cooler' | 'shield' | 'emitter' | 'life' | 'gravity' | 'radar'
+type Icon = 'quantum' | 'power' | 'engine' | 'weapon' | 'cooler' | 'shield' | 'emitter' | 'life' | 'gravity' | 'radar'
 interface Category {
   key: string // champ vehicle.state.power.<key>
   label: string
@@ -28,10 +28,20 @@ const CATEGORIES: Category[] = [
   { key: 'sensors', label: 'Radar', icon: 'radar', ann: 'radr' },
   { key: 'life_support', label: 'Life Support', icon: 'life' },
   { key: 'gravity_generators', label: 'Gravity Generator', icon: 'gravity' },
+  // pas de champ d'alimentation pour le quantum : seulement son voyant (éteint en SCM, normal en NAV)
+  { key: 'quantum', label: 'Quantum Drive', icon: 'quantum', ann: 'qdrv' },
+]
+
+// Disposition en 3 colonnes : armes | défense et détection | énergie, quantum et confort
+const COLUMNS = [
+  ['weapons'],
+  ['shield_generators', 'shield_emitters', 'sensors', 'engines'],
+  ['powerplants', 'coolers', 'quantum', 'life_support', 'gravity_generators'],
 ]
 
 // Pictos SVG (grille 24×24), en currentColor
 const ICONS: Record<Icon, string> = {
+  quantum: 'M3 12h11M10 8l4 4-4 4M17 6v12M21 8v8',
   power: 'M13 2 5 13.5h6L10 22l8-11.5h-6z',
   engine: 'M8 3h8l-1.5 7h-5zM7 10h10l-1 3H8zM9.5 16l2.5 5 2.5-5',
   weapon: 'M12 3v5M12 16v5M3 12h5M16 12h5M12 7a5 5 0 1 0 0 10a5 5 0 1 0 0-10',
@@ -71,17 +81,17 @@ const weapons = computed(() => {
 })
 
 // ---- État d'une catégorie ----
-const powered = (c: Category) => bool(`${VEH}power.${c.key}`)
+const powered = (c: Category) => (c.key === 'quantum' ? annunciator('qdrv') !== 'off' : bool(`${VEH}power.${c.key}`))
 const level = (c: Category): AnnLevel => (c.ann ? annunciator(c.ann) : 'off')
 // Radar à l'orange = un ennemi nous verrouille au radar (relevé en test réel), pas une panne de notre radar
 const locked = (c: Category) => c.key === 'sensors' && level(c) === 'minor'
 function stateLabel(c: Category): string {
-  if (!powered(c)) return 'Off'
+  if (!powered(c)) return c.key === 'quantum' ? 'Standby' : 'Off'
   if (locked(c)) return 'Locked'
   if (level(c) === 'major') return 'Fault'
   if (level(c) === 'minor') return 'Warn'
   if (c.key === 'weapons' && weapons.value.length) return `${weapons.value.filter((w) => w.ready).length}/${weapons.value.length} ready`
-  return 'On'
+  return c.key === 'quantum' ? 'Ready' : 'On'
 }
 const flashing = (c: Category) => !!c.ann && annunciatorFlashing(c.ann)
 
@@ -98,7 +108,12 @@ const counts = computed(() => {
 
 // Ordre d'affichage : ce qui a un souci passe en tête (majeur, puis mineur), le reste garde l'ordre normal.
 const RANK: Record<AnnLevel, number> = { major: 0, minor: 1, nominal: 2, off: 2 }
-const sorted = computed(() => [...CATEGORIES].sort((a, b) => RANK[level(a)] - RANK[level(b)]))
+// chaque colonne trie ses composants : ce qui a un souci en tête
+const columns = computed(() =>
+  COLUMNS.map((keys) =>
+    keys.map((k) => CATEGORIES.find((c) => c.key === k)!).sort((a, b) => RANK[level(a)] - RANK[level(b)]),
+  ),
+)
 // Armes : non alimentées puis pas prêtes en tête
 const weaponRank = (w: { powered: boolean; ready: boolean }) => (!w.powered ? 0 : !w.ready ? 1 : 2)
 const sortedWeapons = computed(() => [...weapons.value].sort((a, b) => weaponRank(a) - weaponRank(b)))
@@ -118,10 +133,10 @@ const folded = reactive<Record<string, boolean>>({})
       </span>
     </div>
 
-    <!-- liste qui défile : elle prend la hauteur laissée par les autres panneaux de la rangée -->
-    <div class="scroll">
-    <ul class="tree">
-      <li v-for="c in sorted" :key="c.key" :data-s="level(c)" :class="{ off: !powered(c), flash: flashing(c) }">
+    <!-- 3 colonnes côte à côte (une seule sur téléphone) -->
+    <div class="cols3">
+    <ul v-for="(col, ci) in columns" :key="ci" class="tree">
+      <li v-for="c in col" :key="c.key" :data-s="level(c)" :class="{ off: !powered(c), flash: flashing(c) }">
         <button
           type="button"
           class="cat"
@@ -160,27 +175,11 @@ const folded = reactive<Record<string, boolean>>({})
   height: 100%;
 }
 
-// Le contenu est en absolu : il ne compte pas dans la hauteur du panneau, qui suit donc la rangée.
-// min-height faible : ce sont les panneaux voisins (pilote…) qui fixent la hauteur de la rangée.
-// Seul sur sa ligne (téléphone, une colonne), la liste garde une hauteur confortable.
-.scroll {
-  position: relative;
-  min-height: 170px; // au moins 4 composants visibles
-
-  @media (max-width: 640px) {
-    min-height: 260px;
-  }
-
-  > .tree {
-    position: absolute;
-    inset: 0;
-    overflow-y: auto;
-    overscroll-behavior: contain;
-    align-content: start; // hauteur fixe : les lignes ne doivent pas s'étirer
-    padding-right: 4px;
-    scrollbar-width: thin;
-    scrollbar-color: var(--cyan-dim) transparent;
-  }
+.cols3 {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+  align-items: start;
+  gap: 6px 14px;
 }
 
 .head {

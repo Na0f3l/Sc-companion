@@ -21,14 +21,17 @@ const LIST = [
 <style scoped lang="scss">
 .ann {
   display: grid;
-  grid-template-columns: repeat(5, 1fr);
-  gap: 6px;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  align-content: start;
+  gap: 4px;
 
+  // tuiles compactes : hauteur fixée par leur contenu, jamais étirées
   > div {
     display: grid;
     place-items: center;
-    gap: 2px;
-    padding: 8px 2px;
+    gap: 1px;
+    min-width: 0;
+    padding: 5px 2px;
     border: 1px solid var(--line);
     background: var(--panel);
     color: var(--cyan-dim);
@@ -42,7 +45,11 @@ b {
 }
 
 small {
-  font-size: 9px;
+  overflow: hidden;
+  max-width: 100%;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 8px;
   letter-spacing: 0.06em;
   text-transform: uppercase;
   opacity: 0.8;

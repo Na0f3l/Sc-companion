@@ -107,7 +107,7 @@ const role = computed(() => {
 </script>
 
 <template>
-  <section class="screens">
+  <section class="screens flight">
     <MfdPanel title="Flight instruments" source="flight.instruments" tab="FLIGHT">
       <!-- comme le HUD du jeu : états du vaisseau à gauche, vitesse / boost au centre, leurres à droite -->
       <div class="top">
@@ -209,34 +209,40 @@ const role = computed(() => {
       <div class="row"><span class="lbl">G limit</span><span class="num">{{ gMax.toFixed(1) }} G</span></div>
     </MfdPanel>
 
-    <MfdPanel title="Annunciators" source="annunciators" tab="WARNINGS">
-      <Annunciators />
-    </MfdPanel>
 
-    <MfdPanel title="Diagnostics" source="power · annunciators · weapons" tab="DIAGNOSTICS">
+
+
+    <!-- 3e colonne : voyants et pilote l'un au-dessus de l'autre -->
+    <div class="side">
+      <MfdPanel title="Annunciators" source="annunciators" tab="WARNINGS">
+        <Annunciators />
+      </MfdPanel>
+      <MfdPanel class="crew" title="Pilot" source="actor.vitals" tab="CREW">
+        <VitalRings compact />
+        <!-- coeur, O2 et siège sur une seule ligne : le panneau reste court -->
+        <div class="pilot">
+          <div class="stack">
+            <span class="lbl">Heart</span>
+            <span class="num">{{ Math.round(num(ACT + 'vitals.heart_rate')) }}<span class="unit">bpm</span></span>
+          </div>
+          <div class="stack">
+            <span class="lbl">Oxygen</span>
+            <span class="num">{{ Math.round(num(ACT + 'vitals.oxygen.current') * 100) }}<span class="unit">%</span></span>
+          </div>
+          <div class="stack">
+            <span class="lbl">Seat</span>
+            <span class="state">{{ role }}</span>
+          </div>
+        </div>
+      </MfdPanel>
+    </div>
+
+    <!-- composants sur toute la largeur, en 3 colonnes -->
+    <MfdPanel class="full" title="Diagnostics" source="power · annunciators · weapons" tab="DIAGNOSTICS">
       <Diagnostics />
     </MfdPanel>
 
-    <MfdPanel class="crew" title="Pilot" source="actor.vitals" tab="CREW">
-      <VitalRings compact />
-      <!-- coeur, O2 et siège sur une seule ligne : le panneau reste court -->
-      <div class="pilot">
-        <div class="stack">
-          <span class="lbl">Heart</span>
-          <span class="num">{{ Math.round(num(ACT + 'vitals.heart_rate')) }}<span class="unit">bpm</span></span>
-        </div>
-        <div class="stack">
-          <span class="lbl">Oxygen</span>
-          <span class="num">{{ Math.round(num(ACT + 'vitals.oxygen.current') * 100) }}<span class="unit">%</span></span>
-        </div>
-        <div class="stack">
-          <span class="lbl">Seat</span>
-          <span class="state">{{ role }}</span>
-        </div>
-      </div>
-    </MfdPanel>
-
-    <MfdPanel class="wide ghost" title="Hull · shields · quantum" source="vehicle.health · shields · quantum_fuel" tab="DAMAGE">
+    <MfdPanel class="full ghost" title="Hull · shields · quantum" source="vehicle.health · shields · quantum_fuel" tab="DAMAGE">
       <span class="q">NOT RECEIVED</span>
       <p>These fields exist in the schema but the game does not send them yet (LIVE 4.10).</p>
     </MfdPanel>
@@ -292,6 +298,25 @@ const role = computed(() => {
 .cm {
   height: var(--vbar-h);
   margin-top: calc(var(--mode-h) + var(--mode-gap));
+}
+
+// Disposition : Flight | Propulsion | (Annunciators + Pilot), puis Diagnostics sur toute la largeur.
+// Sous 900 px, la grille automatique de base reprend la main (2 colonnes, puis 1 sur téléphone).
+@media (min-width: 900px) {
+  .flight {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+.flight > .full {
+  grid-column: 1 / -1;
+}
+
+.side {
+  display: grid;
+  align-content: start;
+  gap: 14px;
+  min-width: 0;
 }
 
 // Écran pilote le plus court possible : contenu tassé en haut (pas réparti sur la hauteur de la rangée),
