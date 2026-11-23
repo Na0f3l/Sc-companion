@@ -57,7 +57,8 @@ const ticks = Array.from({ length: 36 }, (_, i) => {
       </g>
       <!-- balayage : secteur dégradé + ligne, tourne lentement -->
       <g class="sweep">
-        <path d="M100 100 L100 8 A92 92 0 0 1 165 35 Z" class="cone" />
+        <!-- traînée derrière le trait (sens inverse de la rotation) -->
+        <path d="M100 100 L100 8 A92 92 0 0 0 35 35 Z" class="cone" />
         <line x1="100" y1="100" x2="100" y2="8" class="beam" />
       </g>
       <circle cx="100" cy="100" r="4" class="hub" />
