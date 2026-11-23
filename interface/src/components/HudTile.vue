@@ -1,13 +1,18 @@
 <script setup lang="ts">
 // Tuile du HUD : un visuel (picto, jauge…) dans le slot, la valeur dessous, un libellé discret.
-withDefaults(defineProps<{ value: string; label: string; tone?: 'ok' | 'good' | 'warn' | 'crit' }>(), { tone: 'ok' })
+// soon : donnée prévue par le jeu mais pas encore envoyée → tuile grisée avec « coming soon » (comme Q-Fuel)
+withDefaults(defineProps<{ value: string; label: string; tone?: 'ok' | 'good' | 'warn' | 'crit'; soon?: boolean }>(), {
+  tone: 'ok',
+  soon: false,
+})
 </script>
 
 <template>
-  <div class="tile" :class="`is-${tone}`">
+  <div class="tile" :class="soon ? 'is-soon' : `is-${tone}`">
     <div class="visual"><slot /></div>
     <span class="val">{{ value }}</span>
     <span class="name">{{ label }}</span>
+    <span v-if="soon" class="soon">coming soon</span>
   </div>
 </template>
 
@@ -44,6 +49,17 @@ withDefaults(defineProps<{ value: string; label: string; tone?: 'ok' | 'good' | 
   @include label;
   font-size: 9px;
   text-align: center;
+}
+
+// Donnée pas encore envoyée par le jeu
+.is-soon :is(.visual, .val, .name) {
+  opacity: 0.4;
+}
+
+.soon {
+  @include label;
+  font-size: 8px;
+  letter-spacing: 0.08em;
 }
 
 // L'état colore la valeur ET le picto (le visuel utilise currentColor)

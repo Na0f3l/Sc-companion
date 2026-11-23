@@ -1,7 +1,7 @@
 <script setup lang="ts">
 // Écrans affichés quand le personnage est à pied. Pictos et jauges inspirés de l'écran Santé / Environnement du jeu.
-import { computed } from 'vue'
-import { ACT, bool, num, str } from '@/telemetry'
+import { computed, ref, watchEffect } from 'vue'
+import { ACT, bool, has, num, str } from '@/telemetry'
 import MfdPanel from '@/components/MfdPanel.vue'
 import Sparkline from '@/components/Sparkline.vue'
 import VitalRings from '@/components/VitalRings.vue'
@@ -21,9 +21,13 @@ const heart = computed(() => num(V + 'heart_rate'))
 const o2 = computed(() => num(V + 'oxygen.current') / (num(V + 'oxygen.max', 1) || 1))
 // intoxication_level : absent quand il vaut 0 (le jeu n'envoie pas les zéros). Échelle supposée 0 → 100.
 const intox = computed(() => clamp01(num(V + 'intoxication_level') / 100))
-// Le jeu affiche une décimale (1.1 %) mais le champ est un ENTIER (int32) : jamais vu autre chose que
-// absent (= 0) en LIVE 4.10, même avec 1,1 % en jeu. Affiché tel quel, sans décimale inventée.
+// Prévu par le schéma (int32) mais jamais envoyé en LIVE 4.10, même drogué en jeu (capture brute du 2026-11-23).
+// Tuile grisée « coming soon » tant que le champ n'a jamais été reçu ; dès qu'il arrive, elle s'active seule.
 const intoxPct = computed(() => Math.round(intox.value * 100))
+const intoxSeen = ref(false)
+watchEffect(() => {
+  if (has(V + 'intoxication_level')) intoxSeen.value = true
+})
 
 // ---- Environnement ----
 const gravity = computed(() => num(V + 'gravity'))
@@ -66,7 +70,12 @@ const loco = computed(() => LOCO[str(`${ACT}state.locomotion`).replace('ACTOR_LO
         <HudTile :value="`${Math.round(o2 * 100)} %`" label="Oxygen" :tone="o2 < 0.3 ? 'crit' : 'ok'">
           <ArcMeter :value="o2" color="#3b82f6"><span class="o2">O<sub>2</sub></span></ArcMeter>
         </HudTile>
-        <HudTile :value="`${intoxPct} %`" label="Drugs" :tone="intox > 0.6 ? 'crit' : intox > 0.3 ? 'warn' : 'ok'">
+        <HudTile
+          :value="intoxSeen ? `${intoxPct} %` : '— %'"
+          label="Drugs"
+          :tone="intox > 0.6 ? 'crit' : intox > 0.3 ? 'warn' : 'ok'"
+          :soon="!intoxSeen"
+        >
           <ArcMeter :value="intox" color="#f97316"><HudIcon name="pills" /></ArcMeter>
         </HudTile>
       </div>
