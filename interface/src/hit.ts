@@ -17,10 +17,33 @@ const MIN_GAP_MS = 300
 let last = 0
 let timer: ReturnType<typeof setTimeout> | undefined
 
+// Voile rouge plein écran, par-dessus l'interface recolorée : quasi opaque d'un coup, puis s'efface vite.
+// Créé une seule fois ; seule son opacité est animée (carte graphique, aucun recalcul de la page).
+const VEIL_OPACITY = 0.7
+const VEIL_MS = 250
+let veil: HTMLDivElement | null = null
+function veilFlash(): void {
+  if (!veil) {
+    veil = document.createElement('div')
+    Object.assign(veil.style, {
+      position: 'fixed',
+      inset: '0',
+      zIndex: '200',
+      pointerEvents: 'none', // ne bloque jamais l'écran
+      background: '#ff2a1f',
+      opacity: '0',
+    })
+    document.body.appendChild(veil)
+  }
+  veil.getAnimations().forEach((a) => a.cancel())
+  veil.animate([{ opacity: VEIL_OPACITY }, { opacity: 0 }], { duration: VEIL_MS, easing: 'cubic-bezier(0.2, 0, 0.6, 1)' })
+}
+
 export function flash(): void {
   const now = performance.now()
   if (now - last < MIN_GAP_MS) return
   last = now
+  veilFlash()
   const root = document.documentElement
   clearTimeout(timer)
   // 1. rouge instantané (sans transition)
