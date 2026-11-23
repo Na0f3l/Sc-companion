@@ -36,6 +36,32 @@ body {
   font-size: 14px;
 }
 
+// ---- Classes utilitaires partagées par les écrans ----
+.lbl { @include label; }
+.num { @include numeric; color: var(--text); }
+.big { font-size: 40px; font-weight: 600; line-height: 1; color: var(--cyan); }
+.mid { font-size: 22px; font-weight: 500; }
+.unit { margin-left: 3px; font-size: 12px; color: var(--muted); }
+.row { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; }
+.stack { display: grid; gap: 4px; }
+.cols { display: grid; grid-template-columns: repeat(auto-fit, minmax(70px, 1fr)); gap: 10px; }
+.bars { display: flex; justify-content: space-around; align-items: flex-end; gap: 14px; }
+.bar { display: grid; justify-items: center; gap: 6px; }
+.list { display: grid; gap: 5px; }
+.list > div { display: flex; justify-content: space-between; align-items: center; gap: 10px; font-size: 13px; }
+.chips { display: flex; flex-wrap: wrap; gap: 5px; }
+.chip { padding: 3px 7px; border: 1px solid var(--line); color: var(--muted); font-size: 11px; letter-spacing: 0.06em; }
+.chip.on { color: var(--cyan); border-color: var(--cyan-dim); background: rgb(99 228 221 / 6%); }
+.chip.hot { color: var(--bg); background: var(--amber); border-color: var(--amber); }
+.state { @include numeric; font-size: 13px; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; color: var(--cyan); }
+.state.warn { color: var(--amber); }
+.pip { flex: none; width: 10px; height: 10px; border: 1px solid var(--cyan-dim); background: var(--off); }
+.pip.on { background: var(--cyan); border-color: var(--cyan); }
+.pip.busy { background: var(--amber); border-color: var(--amber); }
+.screens { display: grid; gap: 14px; grid-template-columns: repeat(auto-fit, minmax(min(100%, 270px), 1fr)); }
+.screens > .wide { grid-column: span 2; }
+@media (max-width: 620px) { .screens > .wide { grid-column: auto; } }
+
 // Respect du réglage système « réduire les animations » (et économie de calcul).
 @media (prefers-reduced-motion: reduce) {
   *,

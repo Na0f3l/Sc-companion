@@ -1,0 +1,17 @@
+{
+  // Node 24 exécute le TypeScript directement (il efface les types) : pas d'étape de compilation.
+  // tsc ne sert qu'à vérifier les types (npm run check).
+  "compilerOptions": {
+    "target": "esnext",
+    "module": "nodenext",
+    "moduleResolution": "nodenext",
+    "strict": true,
+    "noEmit": true,
+    "allowImportingTsExtensions": true,
+    "erasableSyntaxOnly": true,
+    "verbatimModuleSyntax": true,
+    "skipLibCheck": true,
+    "types": ["node"]
+  },
+  "include": ["src"]
+}

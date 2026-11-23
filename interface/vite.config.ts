@@ -23,5 +23,7 @@ export default defineConfig({
   },
   server: {
     host: true, // accessible depuis le téléphone sur le Wi-Fi local (http://<ip-du-pc>:5173)
+    // /ws est relayé vers le service : la page parle toujours à sa propre adresse, PC comme téléphone
+    proxy: { '/ws': { target: 'ws://localhost:2950', ws: true } },
   },
 })

@@ -1,123 +1,118 @@
 <script setup lang="ts">
-// Page de test de l'étape 1 : les curseurs modifient un objet réactif, les barres se mettent à jour toutes seules.
-import { reactive } from 'vue'
-import MfdPanel from './components/MfdPanel.vue'
-import SegBar from './components/SegBar.vue'
+// Page principale : choisit les écrans selon le contexte du personnage (à pied / aux commandes).
+import { computed, onMounted } from 'vue'
+import { ACT, VEH, connect, has, link, source, str } from './telemetry'
+import FlightView from './views/FlightView.vue'
+import FootView from './views/FootView.vue'
 
-// reactive : Vue surveille chaque propriété ; toute modification met à jour ce qui l'affiche.
-const v = reactive({ h2: 0.82, boost: 1, g: 0.25, health: 0.66 })
-const sliders = ['h2', 'boost', 'g', 'health'] as const
+onMounted(connect)
+
+const ctx = computed<'vol' | 'pied' | 'attente'>(() => {
+  if (!has(`${ACT}state.locomotion`)) return 'attente'
+  const seated = str(`${ACT}state.locomotion`).endsWith('SEATED')
+  return seated && has(`${VEH}class_name`) ? 'vol' : 'pied'
+})
+const ship = computed(() => str(`${VEH}class_name`).replaceAll('_', ' '))
 </script>
 
 <template>
   <main class="page">
-    <h1>SC COMPANION <small>étape 1 · composants</small></h1>
+    <header class="top">
+      <div class="brand">SC COMPANION</div>
+      <div class="ctx" aria-live="polite">
+        <span class="dot" :class="{ off: link !== 'en ligne' }" />
+        <template v-if="ctx === 'vol'"><b>En vol</b> · {{ ship }}</template>
+        <template v-else-if="ctx === 'pied'"><b>À pied</b> · Personnage</template>
+        <template v-else>En attente du jeu…</template>
+      </div>
+      <div class="feed">{{ link }}<template v-if="source"> · {{ source === 'replay' ? 'rejeu de capture' : source }}</template></div>
+    </header>
 
-    <div class="grid">
-      <MfdPanel title="Propulsion" source="fuel · boost · g_meter" tab="PROPULSION">
-        <div class="bars">
-          <div class="bar">
-            <span class="num">{{ Math.round(v.h2 * 100) }} %</span>
-            <SegBar :value="v.h2" :segments="12" vertical />
-            <span class="lbl">H₂</span>
-          </div>
-          <div class="bar">
-            <span class="num">{{ Math.round(v.boost * 100) }} %</span>
-            <SegBar :value="v.boost" :segments="12" vertical />
-            <span class="lbl">Boost</span>
-          </div>
-          <div class="bar">
-            <span class="num">{{ (v.g * 9.3).toFixed(1) }}</span>
-            <SegBar :value="v.g" :segments="12" vertical alert="high" />
-            <span class="lbl">Charge G</span>
-          </div>
-        </div>
-      </MfdPanel>
-
-      <MfdPanel title="Pilote" source="actor.vitals" tab="ÉQUIPAGE">
-        <div class="row">
-          <span class="lbl">Santé</span><span class="num big">{{ Math.round(v.health * 100) }}</span>
-        </div>
-        <SegBar :value="v.health" :segments="20" />
-      </MfdPanel>
-
-      <MfdPanel title="Test" tab="RÉGLAGES">
-        <label v-for="key in sliders" :key="key" class="slider">
-          <span class="lbl">{{ key }}</span>
-          <!-- v-model.number : relie le curseur à la valeur, dans les deux sens -->
-          <input v-model.number="v[key]" type="range" min="0" max="1" step="0.01" />
-        </label>
-      </MfdPanel>
-    </div>
+    <!-- Transition : l'ancien écran s'efface, le nouveau apparaît (opacity uniquement) -->
+    <Transition name="swap" mode="out-in">
+      <FlightView v-if="ctx === 'vol'" />
+      <FootView v-else-if="ctx === 'pied'" />
+      <p v-else class="wait">
+        Aucune donnée pour l'instant. Le service doit tourner, et le jeu doit être lancé avec le personnage en jeu.
+      </p>
+    </Transition>
   </main>
 </template>
 
 <style scoped lang="scss">
 .page {
+  display: grid;
+  gap: 18px;
   max-width: 1180px;
   margin: 0 auto;
   padding: 20px max(16px, env(safe-area-inset-right)) 32px max(16px, env(safe-area-inset-left));
 }
 
-h1 {
+.top {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px 20px;
+}
+
+.brand {
   @include numeric;
-  margin: 0 0 18px;
   color: var(--cyan);
   font-size: 15px;
+  font-weight: 700;
   letter-spacing: 0.18em;
-
-  small {
-    @include label;
-    margin-left: 8px;
-  }
 }
 
-.grid {
-  display: grid;
-  gap: 14px;
-  grid-template-columns: repeat(auto-fit, minmax(min(100%, 270px), 1fr));
-}
-
-.bars {
-  display: flex;
-  justify-content: space-around;
-  align-items: flex-end;
-}
-
-.bar {
-  display: grid;
-  justify-items: center;
-  gap: 6px;
-}
-
-.row {
-  display: flex;
-  justify-content: space-between;
-  align-items: baseline;
-}
-
-.lbl {
-  @include label;
-}
-
-.num {
-  @include numeric;
-}
-
-.big {
-  font-size: 40px;
-  font-weight: 600;
-  color: var(--cyan);
-}
-
-.slider {
-  display: grid;
-  grid-template-columns: 70px 1fr;
+.ctx {
+  display: inline-flex;
   align-items: center;
   gap: 10px;
+  padding: 6px 14px;
+  border: 1px solid var(--cyan-dim);
+  background: var(--panel);
+  font-size: 13px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  @include bevel(8px);
 
-  input {
-    accent-color: var(--cyan);
+  b {
+    color: var(--cyan);
+    font-weight: 600;
   }
+}
+
+.dot {
+  width: 8px;
+  height: 8px;
+  background: var(--cyan);
+
+  &.off {
+    background: var(--red);
+  }
+}
+
+.feed {
+  @include numeric;
+  margin-left: auto;
+  color: var(--muted);
+  font-size: 12px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.wait {
+  max-width: 60ch;
+  color: var(--muted);
+  line-height: 1.6;
+}
+
+.swap-enter-active,
+.swap-leave-active {
+  transition: opacity 0.2s;
+}
+
+.swap-enter-from,
+.swap-leave-to {
+  opacity: 0;
 }
 </style>
