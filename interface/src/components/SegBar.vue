@@ -14,9 +14,14 @@ const props = withDefaults(
     // 'high' : alerte quand elle est haute (charge G, température)
     // 'none' : jamais d'alerte
     alert?: 'low' | 'high' | 'none'
+    // zone fixe en rouge en bas de la barre (ex. 0.25 pour le boost : en dessous, pas de nouveau boost possible)
+    dangerBelow?: number
   }>(),
-  { segments: 10, vertical: false, alert: 'low' },
+  { segments: 10, vertical: false, alert: 'low', dangerBelow: 0 },
 )
+
+// nombre de segments de la zone rouge (arrondi au segment près)
+const dangerCount = computed(() => Math.round(props.dangerBelow * props.segments))
 
 // computed : recalculé automatiquement, et seulement quand props.value ou props.segments changent.
 const lit = computed(() => Math.round(Math.min(1, Math.max(0, props.value)) * props.segments))
@@ -39,7 +44,7 @@ const level = computed<Level>(() => {
     aria-valuemax="100"
   >
     <!-- v-for sur un nombre : i va de 1 à segments -->
-    <i v-for="i in segments" :key="i" :class="{ on: i <= lit }" />
+    <i v-for="i in segments" :key="i" :class="{ on: i <= lit, danger: i <= dangerCount }" />
   </div>
 </template>
 
@@ -78,6 +83,12 @@ i {
     background: var(--c);
     border-color: var(--c);
   }
+}
+
+// zone rouge fixe : allumée en rouge, et contour rouge même éteinte pour qu'on la voie arriver
+i.danger {
+  --c: var(--red);
+  border-color: rgb(255 91 79 / 45%);
 }
 
 .is-warn i {

@@ -98,7 +98,7 @@ const role = computed(() => {
         </div>
         <div class="bar">
           <span class="num">{{ Math.round(num(FLI + 'boost.reserves') * 100) }} %</span>
-          <SegBar :value="num(FLI + 'boost.reserves')" :segments="12" vertical />
+          <SegBar :value="num(FLI + 'boost.reserves')" :segments="12" vertical alert="none" :danger-below="0.25" />
           <span class="lbl">Boost</span>
         </div>
       </div>
