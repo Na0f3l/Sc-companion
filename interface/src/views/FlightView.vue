@@ -66,15 +66,14 @@ const countermeasures = computed(() => {
 const ifcsOn = (k: string) => bool(`${VEH}flight.settings.${k}.active`)
 // danger : pastille rouge pleine, pour ce qu'on ne doit pas oublier
 //  - CRUISE actif : vitesse automatique, dangereuse si on l'oublie (repasser en couplé relance le vaisseau)
-//  - ESP désactivé : ne devrait jamais l'être, mais le jeu le coupe parfois tout seul. Signalé seulement
-//    si l'ESP est disponible (enabled) et le vaisseau alimenté, pour éviter les fausses alertes.
 type Flag = { label: string; title: string; danger?: boolean }
+// ESP coupé : ne devrait jamais l'être, mais le jeu le coupe parfois tout seul → bande rouge en bas du panneau.
+// Signalé seulement si l'ESP est disponible (enabled) et le vaisseau alimenté, pour éviter les fausses alertes.
 const espLost = () => bool(VEH + 'power.powerplants') && bool(`${VEH}flight.settings.ifcs_esp.enabled`) && !ifcsOn('ifcs_esp')
 const flags = computed(() => {
   const out: Flag[] = []
   if (ifcsOn('ifcs_coupled')) out.push({ label: 'CPLD', title: 'Coupled' })
   if (ifcsOn('ifcs_esp')) out.push({ label: 'ESP', title: 'Enhanced stick precision' })
-  else if (espLost()) out.push({ label: 'ESP', title: 'ESP is OFF', danger: true })
   if (bool(VEH + 'lights_enabled')) out.push({ label: 'LIGHT', title: 'Lights' })
   if (ifcsOn('ifcs_speed_limiter')) out.push({ label: 'LIM', title: 'Speed limiter' })
   if (ifcsOn('ifcs_cruise_mode')) out.push({ label: 'CRUISE', title: 'Cruise control is ON', danger: true })
@@ -169,6 +168,8 @@ const role = computed(() => {
           </span>
         </div>
       </div>
+      <!-- bande d'avertissement collée au bas du panneau, juste au-dessus de l'onglet FLIGHT -->
+      <div v-if="espLost()" class="esp-warn" role="status">Warning · ESP inactive</div>
     </MfdPanel>
 
     <MfdPanel title="Propulsion" source="fuel · boost · g_meter" tab="PROPULSION">
@@ -268,6 +269,18 @@ const role = computed(() => {
 .cm {
   height: var(--vbar-h);
   margin-top: calc(var(--mode-h) + var(--mode-gap));
+}
+
+// pleine largeur, collée à l'onglet du bas (annule le padding du panneau)
+.esp-warn {
+  margin: auto -14px -12px; // -12px : annule l'écart entre le contenu et l'onglet (MfdPanel)
+  padding: 6px 14px;
+  background: var(--red);
+  color: #fff;
+  font: 600 12px var(--font-num);
+  letter-spacing: 0.18em;
+  text-align: center;
+  text-transform: uppercase;
 }
 
 // leurres : libellé + stock, comme sur le HUD du jeu ; grille → libellés et chiffres alignés en colonnes
