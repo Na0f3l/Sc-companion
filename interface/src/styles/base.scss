@@ -1,0 +1,47 @@
+// Styles globaux : couleurs (variables CSS), polices, fond.
+// Les couleurs sont des variables CSS (et pas SCSS) pour pouvoir changer de thème sans recompiler.
+
+:root {
+  color-scheme: dark;
+
+  --bg: #031014;
+  --panel: #06191f;
+  --panel-2: #0a242b;
+  --line: #1b4850;
+  --cyan: #63e4dd;
+  --cyan-dim: #23707a;
+  --off: #0f3036;
+  --text: #c4f4f0;
+  --muted: #5f9c9e;
+  --amber: #f2c23b;
+  --red: #ff5b4f;
+
+  --font-num: 'Oxanium', 'Bahnschrift', 'Segoe UI', sans-serif;
+  --font-ui: 'Chakra Petch', 'Bahnschrift', 'Segoe UI', sans-serif;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  min-height: 100%;
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-ui);
+  font-size: 14px;
+}
+
+// Respect du réglage système « réduire les animations » (et économie de calcul).
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation: none !important;
+    transition: none !important;
+  }
+}

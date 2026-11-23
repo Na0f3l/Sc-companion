@@ -1,0 +1,22 @@
+// Mixins partagés (injectés automatiquement dans chaque composant, voir vite.config.ts).
+// Un mixin ne produit du CSS que là où il est utilisé : aucun coût s'il ne sert pas.
+
+// Coins biseautés haut-gauche / bas-droite, la forme des écrans MFD du jeu.
+@mixin bevel($cut: 12px) {
+  clip-path: polygon(#{$cut} 0, 100% 0, 100% calc(100% - #{$cut}), calc(100% - #{$cut}) 100%, 0 100%, 0 #{$cut});
+}
+
+// Petit libellé en capitales espacées.
+@mixin label {
+  font-family: var(--font-ui);
+  font-size: 11px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+// Chiffres : police à chasse fixe pour que les valeurs ne « dansent » pas en changeant.
+@mixin numeric {
+  font-family: var(--font-num);
+  font-variant-numeric: tabular-nums;
+}
