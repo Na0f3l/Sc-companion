@@ -45,7 +45,9 @@ import { shownAlert } from '@/alerts'
     inset: 0;
     z-index: -1;
     background: radial-gradient(ellipse at center, rgb(var(--glow) / 25%) 0%, rgb(var(--glow) / 70%) 100%);
-    animation: pulse 0.5s ease-out 3; // 3 battements = 1,5 s = DISPLAY_MS
+    // 3 battements = 1,5 s = DISPLAY_MS ; « forwards » : reste sur le dernier état (atténué)
+    // au lieu de revenir à pleine intensité juste avant la sortie
+    animation: pulse 0.5s ease-out 3 forwards;
   }
 }
 
@@ -104,13 +106,39 @@ p {
   text-transform: uppercase;
 }
 
-.alert-enter-active,
-.alert-leave-active {
+// Entrée : fondu rapide (le titre a son propre « coup », voir .title)
+.alert-enter-active {
   transition: opacity 0.15s;
 }
 
-.alert-enter-from,
+.alert-enter-from {
+  opacity: 0;
+}
+
+// Sortie : inverse de l'intro. Le voile s'estompe, le texte repart vers l'avant
+// (il grossit en s'effaçant). Uniquement opacity / transform.
+.alert-leave-active {
+  transition: opacity 0.4s ease-in;
+
+  .title,
+  .msg {
+    transition:
+      transform 0.4s ease-in,
+      opacity 0.4s ease-in;
+  }
+}
+
 .alert-leave-to {
   opacity: 0;
+
+  .title {
+    transform: scale(1.5);
+    opacity: 0;
+  }
+
+  .msg {
+    transform: scale(1.2);
+    opacity: 0;
+  }
 }
 </style>
