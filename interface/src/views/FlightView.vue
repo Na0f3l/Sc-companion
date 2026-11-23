@@ -314,7 +314,7 @@ const role = computed(() => {
 
 .side {
   display: grid;
-  grid-template-rows: auto 1fr; // Pilot prend la hauteur restante : la colonne s'aligne sur Flight / Propulsion
+  grid-template-rows: 1fr 1fr; // moitié / moitié, et la colonne s'aligne sur Flight / Propulsion
   gap: 14px;
   min-width: 0;
 }

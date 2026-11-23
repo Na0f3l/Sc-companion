@@ -22,10 +22,11 @@ const LIST = [
 .ann {
   display: grid;
   grid-template-columns: repeat(5, minmax(0, 1fr));
-  align-content: start;
+  grid-template-rows: repeat(2, 1fr); // les tuiles remplissent la hauteur du panneau
+  height: 100%;
   gap: 4px;
 
-  // tuiles compactes : hauteur fixée par leur contenu, jamais étirées
+  // tuiles : contenu centré, hauteur donnée par le panneau
   > div {
     display: grid;
     place-items: center;
@@ -40,7 +41,7 @@ const LIST = [
 }
 
 b {
-  font: 600 13px var(--font-num);
+  font: 600 15px var(--font-num);
   letter-spacing: 0.08em;
 }
 
@@ -49,7 +50,7 @@ small {
   max-width: 100%;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-size: 8px;
+  font-size: 9px;
   letter-spacing: 0.06em;
   text-transform: uppercase;
   opacity: 0.8;
