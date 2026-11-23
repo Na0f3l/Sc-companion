@@ -83,6 +83,7 @@ path {
 
 .fg {
   stroke: var(--cyan);
+  transition: stroke-dasharray 200ms linear; // lissage entre deux mises à jour (5 par seconde)
 }
 
 .readout {
