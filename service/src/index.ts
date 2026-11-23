@@ -11,6 +11,7 @@ import { diff, flatten, type Flat } from './flat.ts'
 import { createReplaySource } from './sources/replay.ts'
 import { createLiveSource } from './sources/live.ts'
 import type { Source } from './sources/source.ts'
+import { createSystemMonitor } from './system.ts'
 
 const args = process.argv.slice(2)
 const opt = (name: string): string | undefined => {
@@ -24,6 +25,7 @@ const TICK_MS = 200 // 5 envois par seconde au maximum
 // Par défaut : le jeu en direct. --replay <fichier|dossier> pour rejouer des captures.
 const replay = opt('replay')
 const source: Source = replay ? createReplaySource(replay) : createLiveSource(opt('addr'))
+const system = createSystemMonitor() // mémoire SC / système, CPU, GPU, détection de fuite
 
 // ---- Diffusion ------------------------------------------------------------------
 let state: Flat = {} // dernier état envoyé aux écrans
@@ -31,9 +33,10 @@ let timer: NodeJS.Timeout | null = null
 const clients = new Set<WebSocket>()
 
 function tick(): void {
+  // Télémétrie du jeu (absente si le jeu ne tourne pas) + mesures système, dans le même état à plat.
+  // flatten() arrondit aussi les mesures système à 2 décimales.
   const frame = source.latest()
-  if (!frame) return
-  const next = flatten(frame)
+  const next = { ...(frame ? flatten(frame) : {}), ...flatten(system.flat()) }
   const patch = diff(state, next)
   state = next
   if (!patch) return
@@ -43,6 +46,7 @@ function tick(): void {
 
 function onFirstClient(): void {
   source.start()
+  system.start()
   tick()
   timer = setInterval(tick, TICK_MS)
   console.log('Client connected: broadcasting started')
@@ -52,6 +56,7 @@ function onLastClientGone(): void {
   if (timer) clearInterval(timer)
   timer = null
   source.stop()
+  system.stop()
   state = {}
   console.log('No clients left: broadcasting paused')
 }

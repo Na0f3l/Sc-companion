@@ -48,6 +48,18 @@ function lowVital(name: string, on = 0.25, off = 0.3): () => boolean {
   }
 }
 
+// Seuil haut avec hystérésis : vrai au-dessus de `on`, ne redevient faux qu'en dessous de `off`.
+// Faux si la valeur n'est pas reçue.
+function above(key: string, on: number, off: number): () => boolean {
+  let high = false
+  return () => {
+    if (!has(key)) return (high = false)
+    const v = num(key)
+    high = high ? v > off : v > on
+    return high
+  }
+}
+
 // ---- Vol ----
 const gearDown = () => /DEPLOY/.test(str(`${VEH}flight.state.gear`)) // sorti ou en cours de sortie
 
@@ -111,6 +123,10 @@ const RULES: AlertRule[] = [
   { id: 'thirst', level: 'warning', message: 'Dehydrated', active: lowVital('thirst') },
   { id: 'hunger', level: 'warning', message: 'Starving', active: lowVital('hunger') },
   // voyant MISL en rouge : un missile est verrouillé sur le vaisseau
+  // Mémoire (mêmes seuils que l'outil PowerShell) : fuite détectée par le service, engagement système
+  { id: 'ram-leak', level: 'critical', message: 'RAM leak detected', active: () => str('sc.leak') === 'leak' },
+  { id: 'mem-crit', level: 'critical', message: 'Memory critical', active: above('sys.commit_pct', 75, 72) },
+  { id: 'mem-high', level: 'warning', message: 'Memory high', active: above('sys.commit_pct', 65, 62) },
   { id: 'missile', level: 'critical', message: 'Missile lock', active: () => str(`${VEH}annunciators.misl`) === 'ANNUNCIATOR_STATE_MAJOR_ON' },
 ]
 

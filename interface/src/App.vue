@@ -7,6 +7,7 @@ import { soundOn, soundUnlocked, toggleSound } from './sound'
 import FlightView from './views/FlightView.vue'
 import FootView from './views/FootView.vue'
 import AlertOverlay from './components/AlertOverlay.vue'
+import MemoryBar from './components/MemoryBar.vue'
 
 onMounted(connect)
 
@@ -47,6 +48,7 @@ const ship = computed(() => str(`${VEH}class_name`).replaceAll('_', ' '))
     </header>
 
     <AlertOverlay />
+    <MemoryBar />
 
     <!-- Transition : l'ancien écran s'efface, le nouveau apparaît (opacity uniquement) -->
     <Transition name="swap" mode="out-in">
@@ -65,7 +67,8 @@ const ship = computed(() => str(`${VEH}class_name`).replaceAll('_', ' '))
   gap: 18px;
   max-width: 1180px;
   margin: 0 auto;
-  padding: 20px max(16px, env(safe-area-inset-right)) 32px max(16px, env(safe-area-inset-left));
+  // en bas : la place de la bande mémoire fixe (50 px) + marge
+  padding: 20px max(16px, env(safe-area-inset-right)) 80px max(16px, env(safe-area-inset-left));
 }
 
 .top {
