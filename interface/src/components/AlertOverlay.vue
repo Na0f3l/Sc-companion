@@ -21,34 +21,41 @@ import { shownAlert } from '@/alerts'
 <style scoped lang="scss">
 .overlay {
   --a: var(--red);
-  --flash: rgb(255 40 30 / 45%);
+  --glow: 255 40 30;
   position: fixed;
   inset: 0;
   z-index: 100;
   display: grid;
   grid-template-rows: auto 1fr auto;
   padding: env(safe-area-inset-top, 0) env(safe-area-inset-right, 0) env(safe-area-inset-bottom, 0) env(safe-area-inset-left, 0);
-  background: rgb(0 0 0 / 50%);
-  box-shadow:
-    inset 0 0 0 3px var(--a),
-    inset 0 0 140px rgb(255 40 30 / 35%);
+  background: rgb(0 0 0 / 55%);
+  box-shadow: inset 0 0 0 3px var(--a);
   pointer-events: none;
-  // 2 clignotements du fond (rouge / sombre), puis il reste sombre
-  animation: flash 0.5s steps(1) 2;
 
   &.is-warning {
     --a: var(--amber);
-    --flash: rgb(242 194 59 / 40%);
+    --glow: 242 194 59;
+  }
+
+  // Calque coloré qui « bat » : dense sur les bords, plus léger au centre pour garder le texte lisible.
+  // Seule son opacité est animée : la carte graphique s'en charge, sans repeindre la page.
+  &::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    background: radial-gradient(ellipse at center, rgb(var(--glow) / 25%) 0%, rgb(var(--glow) / 70%) 100%);
+    animation: pulse 0.5s ease-out infinite; // 6 battements pendant les 3 s
   }
 }
 
-@keyframes flash {
+@keyframes pulse {
   0% {
-    background: var(--flash);
+    opacity: 1;
   }
 
-  50% {
-    background: rgb(0 0 0 / 50%);
+  100% {
+    opacity: 0.15;
   }
 }
 
@@ -78,6 +85,14 @@ p {
   font-weight: 700;
   line-height: 1;
   letter-spacing: 0.12em;
+  text-shadow: 0 0 24px rgb(0 0 0 / 80%); // lisible même au plus fort du battement
+  animation: punch 0.35s ease-out; // petit « coup » à l'apparition (transform uniquement)
+}
+
+@keyframes punch {
+  from {
+    transform: scale(1.25);
+  }
 }
 
 .msg {

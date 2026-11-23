@@ -8,6 +8,7 @@
 // Une alerte qui reste vraie ne se réaffiche pas ; si elle redevient fausse puis vraie, oui.
 import { computed, ref, watch } from 'vue'
 import { ACT, VEH, has, num, str } from './telemetry'
+import { playAlert } from './sound'
 
 export type AlertLevel = 'critical' | 'warning'
 
@@ -59,7 +60,10 @@ export const shownAlert = ref<AlertRule | null>(null)
 
 function showNext(): void {
   shownAlert.value = queue.shift() ?? null
-  if (shownAlert.value) setTimeout(showNext, DISPLAY_MS)
+  if (shownAlert.value) {
+    playAlert(shownAlert.value.level)
+    setTimeout(showNext, DISPLAY_MS)
+  }
 }
 
 // Détection des fronts montants : une règle présente maintenant et absente juste avant

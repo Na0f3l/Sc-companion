@@ -3,6 +3,7 @@
 import { computed, onMounted, watchEffect } from 'vue'
 import { ACT, VEH, connect, has, link, source, str } from './telemetry'
 import { alertLevel, shownAlert, triggerTest } from './alerts'
+import { soundOn, soundUnlocked, toggleSound } from './sound'
 import FlightView from './views/FlightView.vue'
 import FootView from './views/FootView.vue'
 import AlertOverlay from './components/AlertOverlay.vue'
@@ -33,6 +34,15 @@ const ship = computed(() => str(`${VEH}class_name`).replaceAll('_', ' '))
         <template v-else>En attente du jeu…</template>
       </div>
       <div class="feed">{{ link }}<template v-if="source"> · {{ source === 'replay' ? 'rejeu de capture' : 'jeu en direct' }}</template></div>
+      <!-- le premier clic sur la page déverrouille l'audio ; ce bouton sert aussi à couper / remettre le son -->
+      <button
+        type="button"
+        class="test"
+        :class="{ call: soundOn && !soundUnlocked }"
+        @click="soundUnlocked && toggleSound()"
+      >
+        {{ !soundOn ? 'Son coupé' : soundUnlocked ? 'Son activé' : 'Cliquer pour activer le son' }}
+      </button>
       <button type="button" class="test" :disabled="!!shownAlert" @click="triggerTest">Tester l’alerte</button>
     </header>
 
@@ -128,6 +138,12 @@ const ship = computed(() => str(`${VEH}class_name`).replaceAll('_', ' '))
   &:disabled {
     opacity: 0.5;
     cursor: default;
+  }
+
+  // son pas encore déverrouillé : bouton mis en avant
+  &.call {
+    border-color: var(--amber);
+    color: var(--amber);
   }
 
   &:focus-visible {
