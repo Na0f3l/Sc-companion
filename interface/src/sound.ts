@@ -40,10 +40,10 @@ export function toggleSound(): void {
 
 // Sons d'alerte : deux petits fichiers (interface/public/sounds), décodés une seule fois au
 // déverrouillage de l'audio puis rejoués depuis la mémoire (~0,3 Mo une fois décodés).
-//  - critical : début de « futuristic alert » (Mixkit), coupé à 1,5 s avec fondu de sortie
+//  - critical : « warning » de Lyubomir Ikonomov (Freesound 787777), début silencieux de 0,16 s coupé, 0,6 s
 //  - warning  : « alert sweep » (Mixkit), 0,3 s, plus discret
 const FILES = { critical: '/sounds/critical.mp3', warning: '/sounds/warning.mp3' } as const
-const VOLUME = { critical: 0.8, warning: 0.45 } as const
+const VOLUME = { critical: 0.4, warning: 0.45 } as const // critical plus bas : fichier ~8 dB plus fort que le précédent
 const buffers: Partial<Record<keyof typeof FILES, AudioBuffer>> = {}
 let loading = false
 
