@@ -73,6 +73,16 @@ const weapons = computed(() => {
 // ---- État d'une catégorie ----
 const powered = (c: Category) => bool(`${VEH}power.${c.key}`)
 const level = (c: Category): AnnLevel => (c.ann ? annunciator(c.ann) : 'off')
+// Radar à l'orange = un ennemi nous verrouille au radar (relevé en test réel), pas une panne de notre radar
+const locked = (c: Category) => c.key === 'sensors' && level(c) === 'minor'
+function stateLabel(c: Category): string {
+  if (!powered(c)) return 'Off'
+  if (locked(c)) return 'Locked'
+  if (level(c) === 'major') return 'Fault'
+  if (level(c) === 'minor') return 'Warn'
+  if (c.key === 'weapons' && weapons.value.length) return `${weapons.value.filter((w) => w.ready).length}/${weapons.value.length} ready`
+  return 'On'
+}
 const flashing = (c: Category) => !!c.ann && annunciatorFlashing(c.ann)
 
 // En-tête : nombre de catégories par niveau d'alerte, comme les compteurs du jeu
@@ -81,7 +91,7 @@ const counts = computed(() => {
   for (const c of CATEGORIES) {
     if (powered(c)) out.on++
     const l = level(c)
-    if (l === 'minor' || l === 'major') out[l]++
+    if ((l === 'minor' && !locked(c)) || l === 'major') out[l]++ // un verrouillage n'est pas une panne
   }
   return out
 })
@@ -124,7 +134,7 @@ const folded = reactive<Record<string, boolean>>({})
           <svg viewBox="0 0 24 24" class="ico" aria-hidden="true"><path :d="ICONS[c.icon]" /></svg>
           <span class="name">{{ c.label }}</span>
           <!-- armes : nombre prêtes à tirer / total au lieu de « On » -->
-          <span class="state">{{ powered(c) ? (level(c) === 'major' ? 'Fault' : level(c) === 'minor' ? 'Warn' : c.key === 'weapons' && weapons.length ? `${weapons.filter((w) => w.ready).length}/${weapons.length} ready` : 'On') : 'Off' }}</span>
+          <span class="state">{{ stateLabel(c) }}</span>
           <svg viewBox="0 0 24 24" class="pwr" :class="{ on: powered(c) }" aria-hidden="true"><path :d="POWER_ICON" /></svg>
         </button>
 
