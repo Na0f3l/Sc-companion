@@ -9,7 +9,7 @@
 //
 // Pour les situations « par paliers » (température du corps), on émet aussi des alertes ponctuelles
 // avec pushAlert(), voir plus bas.
-import { computed, ref, shallowRef, watch } from 'vue'
+import { computed, shallowRef, watch } from 'vue'
 import { ACT, FLI, NO_VALUE, VEH, annunciator, bool, has, num, str } from './telemetry'
 import { playAlert } from './sound'
 
@@ -27,11 +27,16 @@ export interface AlertRule extends AlertItem {
 
 export const DISPLAY_MS = 1500 // durée d'affichage d'une alerte (3 battements de 0,5 s, voir AlertOverlay)
 
-// Alerte de test : déclenchée par le bouton de l'en-tête, retombe d'elle-même
-const testAlert = ref(false)
-export function triggerTest(): void {
-  testAlert.value = true
-  setTimeout(() => (testAlert.value = false), DISPLAY_MS + 200)
+// Alertes de test : déclenchées depuis le menu « Test » de l'en-tête, affichées une fois.
+// Mêmes messages et niveaux que les vraies alertes, pour juger du rendu et du son.
+export const TESTS = {
+  medium: { label: 'Medium alert', item: { id: 'test-medium', level: 'warning', message: 'Obstacle nearby' } },
+  high: { label: 'High alert', item: { id: 'test-high', level: 'critical', message: 'Crash imminent' } },
+  ram: { label: 'RAM alert', item: { id: 'test-ram', level: 'critical', message: 'RAM leak detected' } },
+} satisfies Record<string, { label: string; item: AlertItem }>
+export type TestKind = keyof typeof TESTS
+export function triggerTest(kind: TestKind): void {
+  pushAlert({ ...TESTS[kind].item })
 }
 
 // Seuil bas avec hystérésis : vrai sous `on`, ne redevient faux qu'au-dessus de `off`.
@@ -125,10 +130,9 @@ const ground = groundImpact() // une seule instance : son état (hystérésis) e
 
 // Niveaux :
 //  - critical : alerte importante, rouge, avec son
-//  - warning  : alerte secondaire, orange, sans son
+//  - warning  : alerte secondaire, orange, son discret
 // L'ordre fixe la priorité quand plusieurs alertes arrivent ensemble.
 const RULES: AlertRule[] = [
-  { id: 'test', level: 'critical', message: 'Crash imminent', active: () => testAlert.value },
   { id: 'ground-fast', level: 'critical', message: 'Crash imminent', active: () => ground() && fast() },
   { id: 'collision-fast', level: 'critical', message: 'Collision imminent', active: () => proximity(OBSTACLE_MIN_SPEED) && fast() },
   { id: 'ground-slow', level: 'warning', message: 'Ground proximity', active: () => ground() && !fast() },

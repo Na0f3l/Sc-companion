@@ -2,8 +2,10 @@
 // Page principale : choisit les écrans selon le contexte du personnage (à pied / aux commandes).
 import { computed, onMounted, watchEffect } from 'vue'
 import { ACT, VEH, connect, has, link, source, str } from './telemetry'
-import { alertLevel, shownAlert, triggerTest } from './alerts'
+import { alertLevel } from './alerts'
 import { soundOn, soundUnlocked, toggleSound } from './sound'
+import './hit' // flash rouge 0,2 s quand on prend des dégâts
+import TestMenu from './components/TestMenu.vue'
 import FlightView from './views/FlightView.vue'
 import FootView from './views/FootView.vue'
 import AlertOverlay from './components/AlertOverlay.vue'
@@ -60,7 +62,7 @@ const ship = computed(() => str(`${VEH}class_name`).replaceAll('_', ' '))
       >
         {{ !soundOn ? 'Sound off' : soundUnlocked ? 'Sound on' : 'Click to enable sound' }}
       </button>
-      <button type="button" class="test" :disabled="!!shownAlert" @click="triggerTest">Test alert</button>
+      <TestMenu />
     </header>
 
     <AlertOverlay />

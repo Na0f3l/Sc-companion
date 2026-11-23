@@ -54,6 +54,20 @@
   --line: #4a3c14;
 }
 
+// Touché (dégâts perso ou vaisseau) : flash rouge de 0,2 s par-dessus tout le reste.
+// Couleurs de l'Arena Commander, fond un peu plus vif pour rester visible quand on est déjà en AC.
+:root[data-hit] {
+  --cyan: #ff6f61;
+  --cyan-dim: #a8443b;
+  --line: #6a2722;
+  --off: #3a1512;
+  --text: #ffe0dc;
+  --muted: #c98a83;
+  --panel: #2a0d0a;
+  --panel-2: #36110d;
+  --bg: #240807;
+}
+
 *,
 *::before,
 *::after {
