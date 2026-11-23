@@ -17,9 +17,9 @@ interface Part {
 // Jambes écartées et bras décollés du corps : chaque partie se lit séparément (grille 120 × 200)
 const PARTS: Part[] = [
   { key: 'head', label: 'Head', d: 'M60 5a11 13 0 1 1 0 26a11 13 0 1 1 0-26z', line: [49, 18, 30, 18], tx: 24, ty: 18 },
-  { key: 'torso', label: 'Torso', d: 'M46 36h28l3 60H43z', line: [47, 46, 30, 34], tx: 24, ty: 30 },
-  { key: 'right_arm', label: 'Right arm', d: 'M44 38l-9 4-9 54 6 2 10-44z', line: [28, 90, 14, 104], tx: 9, ty: 111 },
-  { key: 'left_arm', label: 'Left arm', d: 'M76 38l9 4 9 54-6 2-10-44z', line: [92, 90, 106, 104], tx: 111, ty: 111 },
+  { key: 'torso', label: 'Torso', d: 'M46 36h28l3 60H43z', line: [49, 40, 37, 27], tx: 32, ty: 22 },
+  { key: 'right_arm', label: 'Right arm', d: 'M44 38 34 42 13 90l6 4 21-42z', line: [14, 88, 3, 98], tx: -2, ty: 104 },
+  { key: 'left_arm', label: 'Left arm', d: 'M76 38 86 42 107 90l-6 4-21-42z', line: [106, 88, 117, 98], tx: 122, ty: 104 },
   { key: 'right_leg', label: 'Right leg', d: 'M44 100h14l-19 96h-9z', line: [37, 160, 18, 160], tx: 11, ty: 160 },
   { key: 'left_leg', label: 'Left leg', d: 'M62 100h14l14 96h-9z', line: [83, 160, 102, 160], tx: 109, ty: 160 },
 ]
