@@ -79,11 +79,22 @@ export function timeToImpact(): number | null {
 }
 
 /**
- * Crash imminent : impact au sol prévu dans moins de 10 s.
+ * Préavis avant impact selon la vitesse : plus on va vite, plus on prévient tôt.
+ *   < 800 m/s : 10 s · de 800 à 1000 m/s : de 10 à 20 s · ≥ 1000 m/s : 20 s
+ * Limite : il faut que le radar voie déjà le sol (altitude radar reçue) au moment du préavis.
+ */
+export function impactLeadTime(speed: number): number {
+  if (speed >= 1000) return 20
+  if (speed > 800) return 10 + ((speed - 800) / 200) * 10
+  return 10
+}
+
+/**
+ * Crash imminent : impact au sol prévu dans moins que le préavis (10 à 20 s selon la vitesse).
  * - descente d'au moins 5 m/s (en dessous, c'est une approche, pas une chute) ;
  * - train sorti = atterrissage voulu : seuil beaucoup plus strict (impact < 3 s à plus de 10 m/s,
  *   c'est-à-dire un posé violent), pour ne pas sonner à chaque atterrissage ;
- * - hystérésis : l'alerte retombe quand l'impact n'est plus prévu avant 12 s.
+ * - hystérésis : l'alerte retombe quand l'impact n'est plus prévu avant préavis + 2 s.
  */
 function groundImpact(): () => boolean {
   let on = false
@@ -91,18 +102,21 @@ function groundImpact(): () => boolean {
     const tti = timeToImpact()
     const sink = -num(`${FLI}vertical_speed_indicator`)
     if (tti === null || bool(`${VEH}flight.state.is_landed`)) return (on = false)
-    const [limit, minSink] = gearDown() ? [3, 10] : [10, 5]
+    const [limit, minSink] = gearDown() ? [3, 10] : [impactLeadTime(num(`${FLI}speed`)), 5]
     on = on ? tti < limit + 2 && sink > minSink / 2 : tti < limit && sink > minSink
     return on
   }
 }
 
 /**
- * Collision : voyant PROX du vaisseau au rouge, sauf en manœuvre de décollage / atterrissage
- * (train sorti ou moins de 30 m/s), où il s'allume normalement près du sol et des hangars.
+ * Collision : voyant PROX du vaisseau au rouge, sauf en manœuvre de décollage / atterrissage :
+ * train sorti, ou vitesse sous `minSpeed` (le voyant s'allume normalement près des hangars et des pads).
  */
-const proximity = () =>
-  str(`${VEH}annunciators.prox`) === 'ANNUNCIATOR_STATE_MAJOR_ON' && !gearDown() && num(`${FLI}speed`) >= 30
+const proximity = (minSpeed: number) =>
+  str(`${VEH}annunciators.prox`) === 'ANNUNCIATOR_STATE_MAJOR_ON' && !gearDown() && num(`${FLI}speed`) >= minSpeed
+// L'alerte orange « obstacle » ne s'affiche qu'au-dessus de cette vitesse : un posé sportif
+// mais maîtrisé (en station notamment) reste silencieux.
+const OBSTACLE_MIN_SPEED = 60 // m/s
 
 // Au-dessus de cette vitesse, un crash ou une collision devient une alerte importante (rouge + son)
 const FAST = 100 // m/s
@@ -116,9 +130,9 @@ const ground = groundImpact() // une seule instance : son état (hystérésis) e
 const RULES: AlertRule[] = [
   { id: 'test', level: 'critical', message: 'Crash imminent', active: () => testAlert.value },
   { id: 'ground-fast', level: 'critical', message: 'Crash imminent', active: () => ground() && fast() },
-  { id: 'collision-fast', level: 'critical', message: 'Collision imminent', active: () => proximity() && fast() },
+  { id: 'collision-fast', level: 'critical', message: 'Collision imminent', active: () => proximity(OBSTACLE_MIN_SPEED) && fast() },
   { id: 'ground-slow', level: 'warning', message: 'Ground proximity', active: () => ground() && !fast() },
-  { id: 'collision-slow', level: 'warning', message: 'Obstacle nearby', active: () => proximity() && !fast() },
+  { id: 'collision-slow', level: 'warning', message: 'Obstacle nearby', active: () => proximity(OBSTACLE_MIN_SPEED) && !fast() },
   { id: 'health', level: 'critical', message: 'Critical health', active: lowVital('health') },
   { id: 'thirst', level: 'warning', message: 'Dehydrated', active: lowVital('thirst') },
   { id: 'hunger', level: 'warning', message: 'Starving', active: lowVital('hunger') },

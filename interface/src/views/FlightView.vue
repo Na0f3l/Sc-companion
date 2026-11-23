@@ -9,7 +9,7 @@ import HeadingTape from '@/components/HeadingTape.vue'
 import Annunciators from '@/components/Annunciators.vue'
 import VitalRings from '@/components/VitalRings.vue'
 import GMeter from '@/components/GMeter.vue'
-import { timeToImpact } from '@/alerts'
+import { impactLeadTime, timeToImpact } from '@/alerts'
 
 const fr = new Intl.NumberFormat('en-US')
 
@@ -127,7 +127,7 @@ const role = computed(() => {
         <!-- temps avant impact au sol, affiché seulement en descente sous 30 s -->
         <div class="stack">
           <span class="lbl">Impact</span>
-          <span class="num mid" :class="{ danger: tti !== null && tti < 10 }">
+          <span class="num mid" :class="{ danger: tti !== null && tti < impactLeadTime(Math.abs(speed)) }">
             <template v-if="tti !== null && tti < 30">{{ tti.toFixed(0) }}<span class="unit">s</span></template>
             <template v-else>—</template>
           </span>
