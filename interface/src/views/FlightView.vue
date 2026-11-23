@@ -4,7 +4,7 @@ import { computed } from 'vue'
 import { ACT, FLI, NO_VALUE, VEH, WPN, bool, has, num, str } from '@/telemetry'
 import MfdPanel from '@/components/MfdPanel.vue'
 import SegBar from '@/components/SegBar.vue'
-import SpeedGauge from '@/components/SpeedGauge.vue'
+import VBar, { type Zone } from '@/components/VBar.vue'
 import HeadingTape from '@/components/HeadingTape.vue'
 import Annunciators from '@/components/Annunciators.vue'
 import VitalRings from '@/components/VitalRings.vue'
@@ -19,6 +19,21 @@ const alt = computed(() => {
   return a > NO_VALUE ? null : a
 })
 const tti = computed(timeToImpact)
+
+// Vitesse : négative en marche arrière (à confirmer en jeu : la jauge passe alors en bleu)
+const speed = computed(() => num(`${FLI}speed`))
+const SPEED_MAX = 1200 // m/s pour une barre pleine
+// Zones relevées sur le HUD du jeu (barre pleine) : ~20 % vert, jusqu'à ~55 % jaune, rouge au-delà
+const SPEED_ZONES: Zone[] = [
+  { to: 0.2, color: '#57e389' },
+  { to: 0.55, color: '#f2c23b' },
+  { to: 1, color: '#ff5b4f' },
+]
+// Boost : les 25 derniers % en rouge (pas de nouveau boost possible), le reste en cyan
+const BOOST_ZONES: Zone[] = [
+  { to: 0.25, color: '#ff5b4f' },
+  { to: 1, color: '#63e4dd' },
+]
 // Proche d'une planète : dans l'atmosphère (densité > 0) ou sol à portée du radar.
 // Hors de là, cap / altitude / vitesse verticale n'ont pas de sens (le HUD du jeu les masque aussi).
 const nearPlanet = computed(() => num(`${FLI}atmospheric_density`) > 0 || alt.value !== null)
@@ -73,7 +88,24 @@ const role = computed(() => {
 <template>
   <section class="screens">
     <MfdPanel title="Flight instruments" source="flight.instruments" tab="FLIGHT">
-      <SpeedGauge :value="num(FLI + 'speed')" />
+      <!-- vitesse et boost côte à côte, comme le HUD du jeu -->
+      <div class="pair">
+        <VBar
+          :value="Math.abs(speed) / SPEED_MAX"
+          :zones="SPEED_ZONES"
+          :reverse="speed < 0"
+          :reading="Math.round(Math.abs(speed)).toString()"
+          label="m/s"
+        />
+        <VBar
+          :value="num(FLI + 'boost.reserves')"
+          :zones="BOOST_ZONES"
+          :reading="`${Math.round(num(FLI + 'boost.reserves') * 100)}%`"
+          label="Boost"
+        >
+          <span class="chip" :class="{ hot: bool(FLI + 'boost.engaged') }">AB</span>
+        </VBar>
+      </div>
       <!-- .masked : invisible mais garde sa place, donc rien ne bouge quand ça apparaît / disparaît -->
       <HeadingTape :heading="num(FLI + 'heading')" :class="{ masked: !nearPlanet }" />
       <div class="cols" :class="{ masked: !nearPlanet }">
@@ -108,20 +140,18 @@ const role = computed(() => {
         <div class="bar">
           <span class="num">{{ Math.round(num(FLI + 'hydrogen_fuel') * 100) }} %</span>
           <SegBar :value="num(FLI + 'hydrogen_fuel')" :segments="12" vertical />
-          <span class="lbl">H₂</span>
+          <span class="lbl">H-Fuel</span>
         </div>
-        <div class="bar">
-          <span class="num">{{ Math.round(num(FLI + 'boost.reserves') * 100) }} %</span>
-          <SegBar :value="num(FLI + 'boost.reserves')" :segments="12" vertical alert="none" :danger-below="0.25" />
-          <span class="lbl">Boost</span>
+        <!-- Q-Fuel : prévu dans le schéma mais pas encore envoyé par le jeu (LIVE 4.10) -->
+        <div class="bar off">
+          <span class="num">— %</span>
+          <SegBar :value="0" :segments="12" vertical alert="none" />
+          <span class="lbl">Q-Fuel</span>
+          <span class="soon">coming soon</span>
         </div>
       </div>
-      <GMeter :g="gCur" :limit="gMax" :speed="num(FLI + 'speed')" />
+      <GMeter :g="gCur" :limit="gMax" :speed="Math.abs(speed)" />
       <div class="row"><span class="lbl">G limit</span><span class="num">{{ gMax.toFixed(1) }} G</span></div>
-      <div class="row">
-        <span class="lbl">Boost</span>
-        <span class="chip" :class="{ hot: bool(FLI + 'boost.engaged') }">{{ bool(FLI + 'boost.engaged') ? 'ACTIVE' : 'INACTIVE' }}</span>
-      </div>
     </MfdPanel>
 
     <MfdPanel title="Annunciators" source="annunciators" tab="WARNINGS">
@@ -189,6 +219,22 @@ const role = computed(() => {
 .masked {
   opacity: 0;
   visibility: hidden;
+}
+
+.pair {
+  display: flex;
+  justify-content: space-evenly;
+  align-items: flex-start;
+}
+
+.off {
+  opacity: 0.4;
+}
+
+.soon {
+  @include label;
+  font-size: 8px;
+  letter-spacing: 0.08em;
 }
 
 .tape,
