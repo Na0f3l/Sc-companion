@@ -7,6 +7,7 @@ export const ALERT_GROUPS = [
   { key: 'hit', label: 'Hit flash' },
   { key: 'crash', label: 'Crash / ground proximity' },
   { key: 'collision', label: 'Collision / obstacle' },
+  { key: 'components', label: 'Component damaged' },
   { key: 'missile', label: 'Missile lock' },
   { key: 'health', label: 'Critical health' },
   { key: 'hunger', label: 'Hunger' },

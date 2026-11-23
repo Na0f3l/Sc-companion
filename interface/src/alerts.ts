@@ -13,6 +13,7 @@ import { computed, shallowRef, watch } from 'vue'
 import { ACT, FLI, NO_VALUE, VEH, annunciator, bool, has, num, str } from './telemetry'
 import { playAlert } from './sound'
 import { type AlertGroup, alertEnabled } from './settings'
+import { flash } from './hit'
 
 export type AlertLevel = 'critical' | 'warning'
 
@@ -221,6 +222,43 @@ watch(
     }
   },
 )
+
+// ---- Composants endommagés ------------------------------------------------------------
+//
+// Le jeu n'envoie rien quand le vaisseau se fait tirer dessus (ni boucliers, ni coque, ni voyant HIT :
+// vérifié en test réel le 2026-11-23). Les dégâts se voient seulement par leurs conséquences : le voyant
+// d'un composant qui passe à l'orange (mineur) puis au rouge (majeur), ex. THR orange après des tirs sur la coque.
+// Alerte quand un voyant s'aggrave ET que le composant est alimenté depuis au moins 3 s : rallumer les
+// boucliers fait passer SHLD au rouge un instant, ce n'est pas un dégât.
+const COMPONENTS = [
+  { ann: 'pwr', power: 'powerplants', name: 'Power plant' },
+  { ann: 'thr', power: 'engines', name: 'Thrusters' },
+  { ann: 'wpn', power: 'weapons', name: 'Weapons' },
+  { ann: 'cool', power: 'coolers', name: 'Coolers' },
+  { ann: 'radr', power: 'sensors', name: 'Radar' },
+  { ann: 'shld', power: 'shield_generators', name: 'Shields' },
+] as const
+const SEVERITY = { off: 0, nominal: 0, minor: 1, major: 2 } as const
+const POWER_SETTLE_MS = 3000
+
+for (const c of COMPONENTS) {
+  let poweredSince = 0
+  watch(
+    () => bool(`${VEH}power.${c.power}`),
+    (on) => (poweredSince = on ? performance.now() : 0),
+    { immediate: true },
+  )
+  watch(
+    () => SEVERITY[annunciator(c.ann)],
+    (now, before) => {
+      if (now <= before || !poweredSince || performance.now() - poweredSince < POWER_SETTLE_MS) return
+      if (!alertEnabled('components')) return
+      const major = now === 2
+      pushAlert({ id: `comp-${c.ann}-${now}`, level: major ? 'critical' : 'warning', message: `${c.name} ${major ? 'critical' : 'damaged'}` })
+      if (alertEnabled('hit')) flash()
+    },
+  )
+}
 
 /** Teinte de toute l'interface pendant l'affichage d'une alerte. */
 export const alertLevel = computed<AlertLevel | null>(() => shownAlert.value?.level ?? null)
