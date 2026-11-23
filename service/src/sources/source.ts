@@ -7,4 +7,5 @@ export interface Source {
   start(): void // appelé quand le premier écran se connecte
   stop(): void // appelé quand le dernier écran se déconnecte : plus aucun travail
   latest(): unknown | null
+  status?(): string // état lisible (« en direct », « jeu introuvable »…)
 }

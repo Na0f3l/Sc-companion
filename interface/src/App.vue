@@ -25,7 +25,7 @@ const ship = computed(() => str(`${VEH}class_name`).replaceAll('_', ' '))
         <template v-else-if="ctx === 'pied'"><b>À pied</b> · Personnage</template>
         <template v-else>En attente du jeu…</template>
       </div>
-      <div class="feed">{{ link }}<template v-if="source"> · {{ source === 'replay' ? 'rejeu de capture' : source }}</template></div>
+      <div class="feed">{{ link }}<template v-if="source"> · {{ source === 'replay' ? 'rejeu de capture' : 'jeu en direct' }}</template></div>
     </header>
 
     <!-- Transition : l'ancien écran s'efface, le nouveau apparaît (opacity uniquement) -->

@@ -4,12 +4,17 @@
   "private": true,
   "description": "Service local : récupère la télémétrie de Star Citizen et la diffuse à l'interface par WebSocket",
   "type": "module",
-  "engines": { "node": ">=24" },
+  "engines": {
+    "node": ">=24"
+  },
   "scripts": {
+    "live": "node src/index.ts",
     "replay": "node src/index.ts --replay ../telemetrie/captures",
     "check": "tsc --noEmit"
   },
   "dependencies": {
+    "@grpc/grpc-js": "^1.14.7",
+    "@grpc/proto-loader": "^0.8.1",
     "ws": "^8.18.0"
   },
   "devDependencies": {

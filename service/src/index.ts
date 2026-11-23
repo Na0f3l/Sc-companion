@@ -9,6 +9,7 @@ import http from 'node:http'
 import { WebSocketServer, type WebSocket } from 'ws'
 import { diff, flatten, type Flat } from './flat.ts'
 import { createReplaySource } from './sources/replay.ts'
+import { createLiveSource } from './sources/live.ts'
 import type { Source } from './sources/source.ts'
 
 const args = process.argv.slice(2)
@@ -20,12 +21,9 @@ const opt = (name: string): string | undefined => {
 const PORT = Number(opt('port') ?? 2950)
 const TICK_MS = 200 // 5 envois par seconde au maximum
 
+// Par défaut : le jeu en direct. --replay <fichier|dossier> pour rejouer des captures.
 const replay = opt('replay')
-if (!replay) {
-  console.error('Source manquante. Pour l’instant : --replay <capture.json | dossier>')
-  process.exit(2)
-}
-const source: Source = createReplaySource(replay)
+const source: Source = replay ? createReplaySource(replay) : createLiveSource(opt('addr'))
 
 // ---- Diffusion ------------------------------------------------------------------
 let state: Flat = {} // dernier état envoyé aux écrans
@@ -65,6 +63,7 @@ const server = http.createServer((req, res) => {
     res.writeHead(200, { 'content-type': 'application/json' })
     res.end(JSON.stringify({
       source: source.name,
+      status: source.status?.() ?? null,
       clients: clients.size,
       keys: Object.keys(state).length,
       rssMo: +(mem.rss / 2 ** 20).toFixed(1),
