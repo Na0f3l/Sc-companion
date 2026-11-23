@@ -21,6 +21,8 @@ const heart = computed(() => num(V + 'heart_rate'))
 const o2 = computed(() => num(V + 'oxygen.current') / (num(V + 'oxygen.max', 1) || 1))
 // intoxication_level : absent quand il vaut 0 (le jeu n'envoie pas les zéros). Échelle supposée 0 → 100.
 const intox = computed(() => clamp01(num(V + 'intoxication_level') / 100))
+// Affichage à une décimale, arrondi vers le bas comme le jeu (0,57 → 0.5 %)
+const intoxPct = computed(() => (Math.floor(intox.value * 1000 + 1e-6) / 10).toFixed(1))
 
 // ---- Environnement ----
 const gravity = computed(() => num(V + 'gravity'))
@@ -63,7 +65,7 @@ const loco = computed(() => LOCO[str(`${ACT}state.locomotion`).replace('ACTOR_LO
         <HudTile :value="`${Math.round(o2 * 100)} %`" label="Oxygen" :tone="o2 < 0.3 ? 'crit' : 'ok'">
           <ArcMeter :value="o2" color="#3b82f6"><span class="o2">O<sub>2</sub></span></ArcMeter>
         </HudTile>
-        <HudTile :value="`${Math.round(intox * 100)} %`" label="Drugs" :tone="intox > 0.6 ? 'crit' : intox > 0.3 ? 'warn' : 'ok'">
+        <HudTile :value="`${intoxPct} %`" label="Drugs" :tone="intox > 0.6 ? 'crit' : intox > 0.3 ? 'warn' : 'ok'">
           <ArcMeter :value="intox" color="#f97316"><HudIcon name="pills" /></ArcMeter>
         </HudTile>
       </div>
