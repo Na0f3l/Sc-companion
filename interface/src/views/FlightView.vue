@@ -52,17 +52,7 @@ const nearPlanet = computed(() => num(`${FLI}atmospheric_density`) > 0 || alt.va
 const gMax = computed(() => num(`${FLI}g_meter.max`, 1) || 1)
 const gCur = computed(() => num(`${FLI}g_meter.current`))
 
-// ---- Armes : weapons.weapons.0.name, weapons.weapons.1.name… (détail dans Diagnostics) ----
-const weaponsCount = computed(() => {
-  let i = 0
-  while (has(`${WPN}weapons.${i}.name`)) i++
-  return i
-})
-const weaponsReady = computed(() => {
-  let n = 0
-  for (let i = 0; i < weaponsCount.value; i++) if (bool(`${WPN}weapons.${i}.ready_to_fire`)) n++
-  return n
-})
+// ---- Leurres (le détail des armes est dans Diagnostics) ----
 const countermeasures = computed(() => {
   const out = { DECOY: 0, NOISE: 0 } as Record<string, number>
   for (let i = 0; has(`${WPN}countermeasures.${i}.type`); i++) {
@@ -97,25 +87,8 @@ const role = computed(() => {
 <template>
   <section class="screens">
     <MfdPanel title="Flight instruments" source="flight.instruments" tab="FLIGHT">
-      <!-- vitesse et boost serrés à gauche, états du vaisseau à droite (comme le HUD du jeu) -->
+      <!-- comme le HUD du jeu : états du vaisseau à gauche, vitesse / boost au centre, leurres à droite -->
       <div class="top">
-        <div class="pair">
-          <VBar
-            :value="Math.abs(speed) / SPEED_MAX"
-            :zones="SPEED_ZONES"
-            :reverse="speed < 0"
-            :reading="Math.round(Math.abs(speed)).toString()"
-            label="m/s"
-          />
-          <VBar
-            :value="num(FLI + 'boost.reserves')"
-            :zones="BOOST_ZONES"
-            :reading="`${Math.round(num(FLI + 'boost.reserves') * 100)}%`"
-            label="Boost"
-          >
-            <span class="chip" :class="{ hot: bool(FLI + 'boost.engaged') }">AB</span>
-          </VBar>
-        </div>
         <div class="hud">
           <span v-if="mode" class="badge" :class="mode.label.toLowerCase()" :title="mode.guessed ? 'Deduced from the quantum drive indicator' : ''">
             {{ mode.label }}
@@ -134,6 +107,28 @@ const role = computed(() => {
             <circle cx="8" cy="14" r="1.2" />
           </svg>
           <span v-for="[label, , title] in flags" :key="label" class="flag" :title="title">{{ label }}</span>
+        </div>
+        <div class="pair">
+          <VBar
+            :value="Math.abs(speed) / SPEED_MAX"
+            :zones="SPEED_ZONES"
+            :reverse="speed < 0"
+            :reading="Math.round(Math.abs(speed)).toString()"
+            label="m/s"
+          />
+          <VBar
+            :value="num(FLI + 'boost.reserves')"
+            :zones="BOOST_ZONES"
+            :reading="`${Math.round(num(FLI + 'boost.reserves') * 100)}%`"
+            label="Boost"
+          >
+            <span class="chip" :class="{ hot: bool(FLI + 'boost.engaged') }">AB</span>
+          </VBar>
+        </div>
+        <!-- leurres restants : le jeu n'envoie que le stock, pas la taille de salve choisie -->
+        <div class="cm">
+          <div><span>Decoy</span><b>{{ countermeasures.DECOY }}</b></div>
+          <div><span>Noise</span><b>{{ countermeasures.NOISE }}</b></div>
         </div>
       </div>
       <!-- .masked : invisible mais garde sa place, donc rien ne bouge quand ça apparaît / disparaît -->
@@ -192,18 +187,6 @@ const role = computed(() => {
       <Diagnostics />
     </MfdPanel>
 
-    <!-- le détail des armes est dans Diagnostics ; ici le résumé et les contre-mesures -->
-    <MfdPanel title="Armament" source="weapons" tab="WEAPONS">
-      <div class="row">
-        <span class="lbl">Ready</span>
-        <span class="num mid">{{ weaponsReady }}<span class="unit">/ {{ weaponsCount }}</span></span>
-      </div>
-      <div class="cms">
-        <div><span class="lbl">Decoys</span><span class="num mid">{{ countermeasures.DECOY }}</span></div>
-        <div><span class="lbl">Noise</span><span class="num mid">{{ countermeasures.NOISE }}</span></div>
-      </div>
-    </MfdPanel>
-
     <MfdPanel title="Pilot" source="actor.vitals" tab="CREW">
       <VitalRings />
       <div class="cols">
@@ -235,9 +218,10 @@ const role = computed(() => {
 
 .top {
   --vbar-h: 120px; // barres un peu plus courtes : moins de hauteur pour le panneau
-  display: flex;
-  align-items: flex-start;
-  gap: 20px;
+  display: grid;
+  grid-template-columns: 1fr auto 1fr; // vitesse / boost centrés, une colonne de chaque côté
+  align-items: start;
+  gap: 16px;
 }
 
 .pair {
@@ -245,11 +229,38 @@ const role = computed(() => {
   gap: 14px;
 }
 
+// leurres : libellé + stock, comme sur le HUD du jeu
+.cm {
+  display: grid;
+  gap: 4px;
+  padding-top: 2px;
+
+  > div {
+    display: flex;
+    gap: 10px;
+    align-items: baseline;
+  }
+
+  span {
+    width: 46px;
+    color: var(--cyan);
+    font: 600 12px var(--font-num);
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+  }
+
+  b {
+    @include numeric;
+    color: var(--text);
+    font-size: 14px;
+  }
+}
+
 // colonne d'états : badges encadrés comme sur le HUD du jeu
 .hud {
   display: flex;
   flex-direction: column;
-  align-items: flex-start;
+  align-items: flex-end; // collés à la barre de vitesse
   gap: 6px;
   padding-top: 2px;
 }
@@ -322,19 +333,6 @@ const role = computed(() => {
 
 .danger {
   color: var(--red);
-}
-
-.cms {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 8px;
-
-  > div {
-    display: grid;
-    gap: 2px;
-    padding: 8px;
-    border: 1px solid var(--line);
-  }
 }
 
 .ghost {

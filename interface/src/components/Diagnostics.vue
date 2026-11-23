@@ -114,7 +114,8 @@ const folded = reactive<Record<string, boolean>>({})
           <span v-else class="chev none" />
           <svg viewBox="0 0 24 24" class="ico" aria-hidden="true"><path :d="ICONS[c.icon]" /></svg>
           <span class="name">{{ c.label }}</span>
-          <span class="state">{{ powered(c) ? (level(c) === 'major' ? 'Fault' : level(c) === 'minor' ? 'Warn' : 'On') : 'Off' }}</span>
+          <!-- armes : nombre prêtes à tirer / total au lieu de « On » -->
+          <span class="state">{{ powered(c) ? (level(c) === 'major' ? 'Fault' : level(c) === 'minor' ? 'Warn' : c.key === 'weapons' && weapons.length ? `${weapons.filter((w) => w.ready).length}/${weapons.length} ready` : 'On') : 'Off' }}</span>
           <svg viewBox="0 0 24 24" class="pwr" :class="{ on: powered(c) }" aria-hidden="true"><path :d="POWER_ICON" /></svg>
         </button>
 
