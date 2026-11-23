@@ -10,7 +10,7 @@
 // Pour les situations « par paliers » (température du corps), on émet aussi des alertes ponctuelles
 // avec pushAlert(), voir plus bas.
 import { computed, shallowRef, watch } from 'vue'
-import { ACT, FLI, NO_VALUE, VEH, annunciator, bool, has, num, str } from './telemetry'
+import { ACT, FLI, NO_VALUE, VEH, annunciator, annunciatorFlashing, bool, has, num, str } from './telemetry'
 import { playAlert } from './sound'
 import { type AlertGroup, alertEnabled, componentAlertEnabled } from './settings'
 import { flash } from './hit'
@@ -148,7 +148,12 @@ const RULES: AlertRule[] = [
   { id: 'ram-leak', group: 'ramLeak', level: 'critical', message: 'RAM leak detected', active: () => str('sc.leak') === 'leak' },
   { id: 'mem-crit', group: 'memory', level: 'critical', message: 'Memory critical', active: above('sys.commit_pct', 75, 72) },
   { id: 'mem-high', group: 'memory', level: 'warning', message: 'Memory high', active: above('sys.commit_pct', 65, 62) },
-  { id: 'missile', group: 'missile', level: 'critical', message: 'Missile lock', active: () => annunciator('misl') === 'major' },
+  // Menaces, relevées en test réel (2026-11-24) : RADR orange fixe = verrouillé au radar ;
+  // MISL rouge fixe = missile verrouillé ; MISL rouge clignotant = missile lancé.
+  // RADR orange peut aussi vouloir dire radar endommagé : impossible à distinguer, traité comme un verrouillage.
+  { id: 'radar-lock', group: 'radarLock', level: 'warning', message: 'Radar lock', active: () => annunciator('radr') === 'minor' },
+  { id: 'missile-lock', group: 'missile', level: 'warning', message: 'Missile lock', active: () => annunciator('misl') === 'major' && !annunciatorFlashing('misl') },
+  { id: 'missile-launch', group: 'missile', level: 'critical', message: 'Missile incoming', active: () => annunciator('misl') === 'major' && annunciatorFlashing('misl') },
 ]
 
 // r.active() est appelé même pour une alerte désactivée : les règles à hystérésis gardent leur état à jour
@@ -252,6 +257,8 @@ for (const c of COMPONENTS) {
     () => SEVERITY[annunciator(c.ann)],
     (now, before) => {
       if (now <= before || !poweredSince || performance.now() - poweredSince < POWER_SETTLE_MS) return
+      // radar à l'orange = verrouillage radar (alerte « Radar lock ») : seul le rouge compte comme dégât
+      if (c.ann === 'radr' && now < 2) return
       if (!componentAlertEnabled(c.ann)) return
       const major = now === 2
       pushAlert({ id: `comp-${c.ann}-${now}`, level: major ? 'critical' : 'warning', message: `${c.name} ${major ? 'critical' : 'damaged'}` })
