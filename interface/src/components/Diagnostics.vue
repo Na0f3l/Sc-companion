@@ -151,10 +151,15 @@ const folded = reactive<Record<string, boolean>>({})
 }
 
 // Le contenu est en absolu : il ne compte pas dans la hauteur du panneau, qui suit donc la rangée.
-// min-height : hauteur minimale quand le panneau est seul sur sa ligne (téléphone).
+// min-height faible : ce sont les panneaux voisins (pilote…) qui fixent la hauteur de la rangée.
+// Seul sur sa ligne (téléphone, une colonne), la liste garde une hauteur confortable.
 .scroll {
   position: relative;
-  min-height: 240px;
+  min-height: 80px;
+
+  @media (max-width: 640px) {
+    min-height: 260px;
+  }
 
   > .tree {
     position: absolute;

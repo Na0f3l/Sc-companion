@@ -200,7 +200,7 @@ const role = computed(() => {
       <Diagnostics />
     </MfdPanel>
 
-    <MfdPanel title="Pilot" source="actor.vitals" tab="CREW">
+    <MfdPanel class="crew" title="Pilot" source="actor.vitals" tab="CREW">
       <VitalRings compact />
       <!-- coeur, O2 et siège sur une seule ligne : le panneau reste court -->
       <div class="pilot">
@@ -277,11 +277,28 @@ const role = computed(() => {
   margin-top: calc(var(--mode-h) + var(--mode-gap));
 }
 
-// écran pilote : trois valeurs côte à côte
+// Écran pilote le plus court possible : contenu tassé en haut (pas réparti sur la hauteur de la rangée),
+// écarts minimaux. :deep(.body) = le contenu de MfdPanel.
+.crew :deep(.body) {
+  align-content: start;
+  gap: 8px;
+}
+
+// trois valeurs côte à côte, libellé collé à la valeur
 .pilot {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
   gap: 8px;
+
+  .stack {
+    gap: 0;
+  }
+
+  .num,
+  .state {
+    font-size: 14px;
+    line-height: 1.3;
+  }
 }
 
 // pleine largeur, collée à l'onglet du bas (annule le padding du panneau)

@@ -37,20 +37,27 @@ const CRIT = 0.25
   gap: 6px;
 
   :deep(.ring) {
-    padding: 6px 4px 5px;
+    align-content: start; // pas d'étirement si la rangée est plus haute
+    padding: 5px 4px 4px;
     gap: 2px;
   }
 
   :deep(svg) {
-    max-width: 40px;
+    max-width: 34px;
+  }
+
+  :deep(figcaption) {
+    gap: 0;
   }
 
   :deep(.pct) {
     font-size: 14px;
+    line-height: 1.1;
   }
 
   :deep(.name) {
-    font-size: 9px;
+    font-size: 8px;
+    line-height: 1.2;
   }
 }
 </style>
