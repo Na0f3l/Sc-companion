@@ -24,10 +24,10 @@ const tti = computed(timeToImpact)
 // Vitesse : négative en marche arrière (à confirmer en jeu : la jauge passe alors en bleu)
 const speed = computed(() => num(`${FLI}speed`))
 const SPEED_MAX = 1200 // m/s pour une barre pleine
-// Zones relevées sur le HUD du jeu (barre pleine) : ~20 % vert, jusqu'à ~55 % jaune, rouge au-delà
+// Zones relevées sur le HUD du jeu (barre pleine) : 25 % vert, 50 % jaune, 25 % rouge
 const SPEED_ZONES: Zone[] = [
-  { to: 0.2, color: '#57e389' },
-  { to: 0.55, color: '#f2c23b' },
+  { to: 0.25, color: '#57e389' },
+  { to: 0.75, color: '#f2c23b' },
   { to: 1, color: '#ff5b4f' },
 ]
 // Boost : les 25 derniers % en rouge (pas de nouveau boost possible), le reste en cyan
