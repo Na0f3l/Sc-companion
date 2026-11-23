@@ -49,6 +49,12 @@ import { shownAlert } from '@/alerts'
     // au lieu de revenir à pleine intensité juste avant la sortie
     animation: pulse 0.5s ease-out 3 forwards;
   }
+
+  // Alerte orange : moins intrusive, voile fixe sans battement (seul le rouge clignote)
+  &.is-warning::before {
+    animation: none;
+    opacity: 0.35;
+  }
 }
 
 @keyframes pulse {

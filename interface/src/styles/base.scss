@@ -54,8 +54,25 @@
   --line: #4a3c14;
 }
 
-// Touché (dégâts perso ou vaisseau) : flash rouge de 0,2 s par-dessus tout le reste.
+// Touché (dégâts perso ou vaisseau) : rouge instantané, puis retour aux couleurs normales en 0,2 s.
 // Couleurs de l'Arena Commander, fond un peu plus vif pour rester visible quand on est déjà en AC.
+// data-hit : le rouge (posé une image) ; data-hit-fade : la transition de retour (voir hit.ts).
+// Pour qu'une variable CSS puisse être animée, elle doit être déclarée comme couleur (@property) ;
+// la transition n'est active que pendant ce retour, les autres changements de thème restent instantanés.
+@each $v in bg, panel, panel-2, line, cyan, cyan-dim, off, text, muted {
+  @property --#{$v} {
+    syntax: '<color>';
+    inherits: true;
+    initial-value: transparent;
+  }
+}
+
+:root[data-hit-fade] {
+  transition-property: --bg, --panel, --panel-2, --line, --cyan, --cyan-dim, --off, --text, --muted;
+  transition-duration: 0.2s;
+  transition-timing-function: ease-out;
+}
+
 :root[data-hit] {
   --cyan: #ff6f61;
   --cyan-dim: #a8443b;
