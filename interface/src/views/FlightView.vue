@@ -260,6 +260,11 @@ const role = computed(() => {
   align-items: flex-start;
 }
 
+// H-Fuel / Q-Fuel alignés par le haut : la ligne « coming soon » sous Q-Fuel ne décale pas sa jauge
+.bars {
+  align-items: flex-start;
+}
+
 .off {
   opacity: 0.4;
 }
