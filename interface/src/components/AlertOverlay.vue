@@ -10,7 +10,7 @@ import { shownAlert } from '@/alerts'
     <div v-if="shownAlert" :key="shownAlert.id" class="overlay" :class="`is-${shownAlert.level}`" role="alert">
       <div class="band" />
       <div class="box">
-        <p class="title">ALERTE !</p>
+        <p class="title">ALERT!</p>
         <p class="msg">{{ shownAlert.message }}</p>
       </div>
       <div class="band" />

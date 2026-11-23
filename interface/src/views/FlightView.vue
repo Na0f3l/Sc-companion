@@ -11,7 +11,7 @@ import VitalRings from '@/components/VitalRings.vue'
 import GMeter from '@/components/GMeter.vue'
 import { timeToImpact } from '@/alerts'
 
-const fr = new Intl.NumberFormat('fr-FR')
+const fr = new Intl.NumberFormat('en-US')
 
 // ---- Instruments ----
 const alt = computed(() => {
@@ -46,21 +46,21 @@ const countermeasures = computed(() => {
 
 // ---- Systèmes ----
 const POWER = [
-  ['powerplants', 'Centrale'], ['engines', 'Moteurs'], ['weapons', 'Armes'], ['shield_generators', 'Boucliers'],
-  ['coolers', 'Refroidisseurs'], ['life_support', 'Support de vie'], ['sensors', 'Capteurs'],
+  ['powerplants', 'Power plant'], ['engines', 'Engines'], ['weapons', 'Weapons'], ['shield_generators', 'Shields'],
+  ['coolers', 'Coolers'], ['life_support', 'Life support'], ['sensors', 'Sensors'],
 ] as const
 const IFCS = [
-  ['ifcs_coupled', 'Couplé'], ['ifcs_stability', 'Stabilité'], ['ifcs_gravity_compensation', 'Comp. gravité'],
-  ['ifcs_proximity_assist', 'Aide proximité'], ['ifcs_esp', 'ESP'], ['ifcs_speed_limiter', 'Limiteur'],
+  ['ifcs_coupled', 'Coupled'], ['ifcs_stability', 'Stability'], ['ifcs_gravity_compensation', 'Grav. comp.'],
+  ['ifcs_proximity_assist', 'Prox. assist'], ['ifcs_esp', 'ESP'], ['ifcs_speed_limiter', 'Limiter'],
 ] as const
 // un réglage est « actif » s'il est actif, ou à défaut activé (certains n'envoient que enabled)
 const ifcsOn = (k: string) => bool(`${VEH}flight.settings.${k}.active`) || bool(`${VEH}flight.settings.${k}.enabled`)
 
-const GEAR: Record<string, string> = { DEPLOYED: 'Sorti', RETRACTED: 'Rentré', RETRACTING: 'Rentre…', DEPLOYING: 'Sort…' }
+const GEAR: Record<string, string> = { DEPLOYED: 'Down', RETRACTED: 'Up', RETRACTING: 'Retracting', DEPLOYING: 'Deploying' }
 const gear = computed(() => str(`${VEH}flight.state.gear`).replace('VEHICLE_COMPONENT_DEPLOYMENT_STATE_', ''))
 
 // ---- Pilote ----
-const ROLE: Record<string, string> = { PILOT: 'Pilote', COPILOT: 'Copilote', TURRET: 'Tourelle' }
+const ROLE: Record<string, string> = { PILOT: 'Pilot', COPILOT: 'Copilot', TURRET: 'Turret' }
 const role = computed(() => {
   const r = str(`${ACT}state.crew_role`).replace('ACTOR_CREW_ROLE_', '')
   return ROLE[r] ?? (r || '—')
@@ -69,23 +69,23 @@ const role = computed(() => {
 
 <template>
   <section class="screens">
-    <MfdPanel title="Instruments de vol" source="flight.instruments" tab="VOL">
+    <MfdPanel title="Flight instruments" source="flight.instruments" tab="FLIGHT">
       <SpeedGauge :value="num(FLI + 'speed')" />
       <HeadingTape :heading="num(FLI + 'heading')" />
       <div class="cols">
         <div class="stack">
-          <span class="lbl">Cap</span>
+          <span class="lbl">Heading</span>
           <span class="num mid">{{ String(Math.round(num(FLI + 'heading')) % 360).padStart(3, '0') }}°</span>
         </div>
         <div class="stack">
-          <span class="lbl">Alt. radar</span>
+          <span class="lbl">Radar alt.</span>
           <span class="num mid">
             <template v-if="alt !== null">{{ fr.format(Math.round(alt)) }}<span class="unit">m</span></template>
             <template v-else>—</template>
           </span>
         </div>
         <div class="stack">
-          <span class="lbl">Vit. vert.</span>
+          <span class="lbl">Vert. speed</span>
           <span class="num mid">{{ num(FLI + 'vertical_speed_indicator').toFixed(1) }}<span class="unit">m/s</span></span>
         </div>
         <!-- temps avant impact au sol, affiché seulement en descente sous 30 s -->
@@ -113,18 +113,18 @@ const role = computed(() => {
         </div>
       </div>
       <GMeter :g="gCur" :limit="gMax" :speed="num(FLI + 'speed')" />
-      <div class="row"><span class="lbl">Limite G</span><span class="num">{{ gMax.toFixed(1) }} G</span></div>
+      <div class="row"><span class="lbl">G limit</span><span class="num">{{ gMax.toFixed(1) }} G</span></div>
       <div class="row">
-        <span class="lbl">Postcombustion</span>
+        <span class="lbl">Boost</span>
         <span class="chip" :class="{ hot: bool(FLI + 'boost.engaged') }">{{ bool(FLI + 'boost.engaged') ? 'ACTIVE' : 'INACTIVE' }}</span>
       </div>
     </MfdPanel>
 
-    <MfdPanel title="Voyants d'alerte" source="annunciators" tab="ALERTES">
+    <MfdPanel title="Annunciators" source="annunciators" tab="WARNINGS">
       <Annunciators />
     </MfdPanel>
 
-    <MfdPanel title="Armement" source="weapons" tab="ARMES">
+    <MfdPanel title="Armament" source="weapons" tab="WEAPONS">
       <div class="list">
         <div v-for="(w, i) in weapons" :key="i">
           <span>{{ w.name }}</span>
@@ -132,20 +132,20 @@ const role = computed(() => {
         </div>
       </div>
       <div class="cms">
-        <div><span class="lbl">Leurres</span><span class="num mid">{{ countermeasures.DECOY }}</span></div>
-        <div><span class="lbl">Brouilleurs</span><span class="num mid">{{ countermeasures.NOISE }}</span></div>
+        <div><span class="lbl">Decoys</span><span class="num mid">{{ countermeasures.DECOY }}</span></div>
+        <div><span class="lbl">Noise</span><span class="num mid">{{ countermeasures.NOISE }}</span></div>
       </div>
     </MfdPanel>
 
-    <MfdPanel title="Systèmes" source="power · flight.state" tab="ÉNERGIE">
+    <MfdPanel title="Systems" source="power · flight.state" tab="POWER">
       <div class="cols">
         <div class="stack">
-          <span class="lbl">Train</span>
+          <span class="lbl">Gear</span>
           <span class="state" :class="{ warn: gear.endsWith('ING') }">{{ GEAR[gear] ?? '—' }}</span>
         </div>
         <div class="stack">
-          <span class="lbl">Situation</span>
-          <span class="state">{{ bool(VEH + 'flight.state.is_landed') ? 'Posé' : 'En vol' }}</span>
+          <span class="lbl">Status</span>
+          <span class="state">{{ bool(VEH + 'flight.state.is_landed') ? 'Landed' : 'Airborne' }}</span>
         </div>
       </div>
       <div class="list">
@@ -158,24 +158,24 @@ const role = computed(() => {
       </div>
     </MfdPanel>
 
-    <MfdPanel title="Pilote" source="actor.vitals" tab="ÉQUIPAGE">
+    <MfdPanel title="Pilot" source="actor.vitals" tab="CREW">
       <VitalRings />
       <div class="cols">
         <div class="stack">
-          <span class="lbl">Cardio</span>
+          <span class="lbl">Heart</span>
           <span class="num mid">{{ Math.round(num(ACT + 'vitals.heart_rate')) }}<span class="unit">bpm</span></span>
         </div>
         <div class="stack">
-          <span class="lbl">Oxygène</span>
+          <span class="lbl">Oxygen</span>
           <span class="num mid">{{ Math.round(num(ACT + 'vitals.oxygen.current') * 100) }}<span class="unit">%</span></span>
         </div>
       </div>
-      <div class="row"><span class="lbl">Poste</span><span class="state">{{ role }}</span></div>
+      <div class="row"><span class="lbl">Seat</span><span class="state">{{ role }}</span></div>
     </MfdPanel>
 
-    <MfdPanel class="wide ghost" title="Coque · boucliers · quantum" source="vehicle.health · shields · quantum_fuel" tab="DÉGÂTS">
-      <span class="q">NON REÇU</span>
-      <p>Ces champs existent dans le schéma mais le jeu ne les a pas envoyés (LIVE 4.10).</p>
+    <MfdPanel class="wide ghost" title="Hull · shields · quantum" source="vehicle.health · shields · quantum_fuel" tab="DAMAGE">
+      <span class="q">NOT RECEIVED</span>
+      <p>These fields exist in the schema but the game does not send them yet (LIVE 4.10).</p>
     </MfdPanel>
   </section>
 </template>

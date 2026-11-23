@@ -10,7 +10,7 @@ import HudIcon from '@/components/HudIcon.vue'
 import ArcMeter from '@/components/ArcMeter.vue'
 import SpectrumDial from '@/components/SpectrumDial.vue'
 
-const fr = new Intl.NumberFormat('fr-FR')
+const fr = new Intl.NumberFormat('en-US')
 const V = `${ACT}vitals.`
 const E = `${ACT}environment.`
 const clamp01 = (x: number) => Math.min(1, Math.max(0, x))
@@ -29,57 +29,57 @@ const hPa = computed(() => num(V + 'pressure') * 1013.25) // le jeu envoie des a
 const extTemp = computed(() => num(E + 'external_temperature'))
 const radiation = computed(() => num(E + 'ambient_radiation_rate'))
 
-const LOCO: Record<string, string> = { ON_FOOT: 'À pied', SEATED: 'Assis' }
+const LOCO: Record<string, string> = { ON_FOOT: 'On foot', SEATED: 'Seated' }
 const loco = computed(() => LOCO[str(`${ACT}state.locomotion`).replace('ACTOR_LOCOMOTION_STATE_', '')] ?? '—')
 </script>
 
 <template>
   <section class="screens">
-    <MfdPanel class="wide" title="Santé" source="actor.vitals" tab="SANTÉ">
+    <MfdPanel class="wide" title="Health" source="actor.vitals" tab="HEALTH">
       <VitalRings />
       <div class="tiles">
-        <HudTile :value="`${Math.round(bodyTemp)} °C`" label="Temp. corps" :tone="bodyTemp > 38.5 || bodyTemp < 35 ? 'warn' : 'ok'">
+        <HudTile :value="`${Math.round(bodyTemp)} °C`" label="Body temp" :tone="bodyTemp > 38.5 || bodyTemp < 35 ? 'warn' : 'ok'">
           <HudIcon name="body-temp" />
         </HudTile>
-        <HudTile :value="`${Math.round(heart)} bpm`" label="Cardio" :tone="heart > 150 ? 'warn' : 'ok'">
+        <HudTile :value="`${Math.round(heart)} bpm`" label="Heart rate" :tone="heart > 150 ? 'warn' : 'ok'">
           <HudIcon name="heart" />
         </HudTile>
-        <HudTile :value="`${Math.round(o2 * 100)} %`" label="Oxygène" :tone="o2 < 0.3 ? 'crit' : 'ok'">
+        <HudTile :value="`${Math.round(o2 * 100)} %`" label="Oxygen" :tone="o2 < 0.3 ? 'crit' : 'ok'">
           <ArcMeter :value="o2" color="#3b82f6"><span class="o2">O<sub>2</sub></span></ArcMeter>
         </HudTile>
-        <HudTile :value="`${Math.round(intox * 100)} %`" label="Drogues" :tone="intox > 0.6 ? 'crit' : intox > 0.3 ? 'warn' : 'ok'">
+        <HudTile :value="`${Math.round(intox * 100)} %`" label="Drugs" :tone="intox > 0.6 ? 'crit' : intox > 0.3 ? 'warn' : 'ok'">
           <ArcMeter :value="intox" color="#f97316"><HudIcon name="pills" /></ArcMeter>
         </HudTile>
       </div>
       <Sparkline :value="heart" :min="40" :max="160" />
     </MfdPanel>
 
-    <MfdPanel class="wide" title="Environnement" source="actor.environment" tab="ENVIRONNEMENT">
+    <MfdPanel class="wide" title="Environment" source="actor.environment" tab="ENVIRONMENT">
       <div class="tiles">
-        <HudTile :value="`${gravity.toFixed(2)} G`" label="Gravité">
+        <HudTile :value="`${gravity.toFixed(2)} G`" label="Gravity">
           <HudIcon name="gravity" />
         </HudTile>
-        <HudTile :value="breathable ? 'Sain' : 'Toxique'" label="Atmosphère" :tone="breathable ? 'good' : 'crit'">
+        <HudTile :value="breathable ? 'Safe' : 'Toxic'" label="Atmosphere" :tone="breathable ? 'good' : 'crit'">
           <HudIcon name="lungs" />
         </HudTile>
-        <HudTile :value="`${Math.round(hPa)} hPa`" label="Pression">
+        <HudTile :value="`${Math.round(hPa)} hPa`" label="Pressure">
           <SpectrumDial :value="hPa / 2026"><HudIcon name="pressure" /></SpectrumDial>
         </HudTile>
-        <HudTile :value="`${Math.round(extTemp)} °C`" label="Température">
+        <HudTile :value="`${Math.round(extTemp)} °C`" label="Temperature">
           <SpectrumDial :value="(extTemp + 60) / 160"><HudIcon name="ext-temp" /></SpectrumDial>
         </HudTile>
-        <HudTile :value="`${radiation.toFixed(radiation < 10 ? 1 : 0)} R/s`" label="Radiations" :tone="radiation > 0 ? 'warn' : 'ok'">
+        <HudTile :value="`${radiation.toFixed(radiation < 10 ? 1 : 0)} R/s`" label="Radiation" :tone="radiation > 0 ? 'warn' : 'ok'">
           <SpectrumDial :value="radiation / 5"><HudIcon name="radiation" /></SpectrumDial>
         </HudTile>
       </div>
     </MfdPanel>
 
-    <MfdPanel title="Portefeuille" source="actor.state.uec_balance" tab="COMPTE">
+    <MfdPanel title="Wallet" source="actor.state.uec_balance" tab="ACCOUNT">
       <div class="stack">
-        <span class="lbl">Solde</span>
+        <span class="lbl">Balance</span>
         <span><span class="num big">{{ fr.format(Number(str(ACT + 'state.uec_balance', '0'))) }}</span><span class="unit">aUEC</span></span>
       </div>
-      <div class="row"><span class="lbl">Déplacement</span><span class="state">{{ loco }}</span></div>
+      <div class="row"><span class="lbl">Movement</span><span class="state">{{ loco }}</span></div>
     </MfdPanel>
   </section>
 </template>

@@ -16,9 +16,9 @@ const CRIT = 0.25
 
 <template>
   <div class="rings">
-    <RingGauge :value="health" icon="health" label="Santé" :warn-at="WARN" :crit-at="CRIT" />
-    <RingGauge :value="hunger" icon="hunger" label="Faim" :warn-at="WARN" :crit-at="CRIT" />
-    <RingGauge :value="thirst" icon="thirst" label="Soif" :warn-at="WARN" :crit-at="CRIT" />
+    <RingGauge :value="health" icon="health" label="Health" :warn-at="WARN" :crit-at="CRIT" />
+    <RingGauge :value="hunger" icon="hunger" label="Hunger" :warn-at="WARN" :crit-at="CRIT" />
+    <RingGauge :value="thirst" icon="thirst" label="Thirst" :warn-at="WARN" :crit-at="CRIT" />
   </div>
 </template>
 

@@ -28,12 +28,12 @@ const ship = computed(() => str(`${VEH}class_name`).replaceAll('_', ' '))
     <header class="top">
       <div class="brand">SC COMPANION</div>
       <div class="ctx" aria-live="polite">
-        <span class="dot" :class="{ off: link !== 'en ligne' }" />
-        <template v-if="ctx === 'vol'"><b>En vol</b> · {{ ship }}</template>
-        <template v-else-if="ctx === 'pied'"><b>À pied</b> · Personnage</template>
-        <template v-else>En attente du jeu…</template>
+        <span class="dot" :class="{ off: link !== 'online' }" />
+        <template v-if="ctx === 'vol'"><b>In flight</b> · {{ ship }}</template>
+        <template v-else-if="ctx === 'pied'"><b>On foot</b> · Character</template>
+        <template v-else>Waiting for the game…</template>
       </div>
-      <div class="feed">{{ link }}<template v-if="source"> · {{ source === 'replay' ? 'rejeu de capture' : 'jeu en direct' }}</template></div>
+      <div class="feed">{{ link }}<template v-if="source"> · {{ source === 'replay' ? 'capture replay' : 'live game' }}</template></div>
       <!-- le premier clic sur la page déverrouille l'audio ; ce bouton sert aussi à couper / remettre le son -->
       <button
         type="button"
@@ -41,9 +41,9 @@ const ship = computed(() => str(`${VEH}class_name`).replaceAll('_', ' '))
         :class="{ call: soundOn && !soundUnlocked }"
         @click="soundUnlocked && toggleSound()"
       >
-        {{ !soundOn ? 'Son coupé' : soundUnlocked ? 'Son activé' : 'Cliquer pour activer le son' }}
+        {{ !soundOn ? 'Sound off' : soundUnlocked ? 'Sound on' : 'Click to enable sound' }}
       </button>
-      <button type="button" class="test" :disabled="!!shownAlert" @click="triggerTest">Tester l’alerte</button>
+      <button type="button" class="test" :disabled="!!shownAlert" @click="triggerTest">Test alert</button>
     </header>
 
     <AlertOverlay />
@@ -53,7 +53,7 @@ const ship = computed(() => str(`${VEH}class_name`).replaceAll('_', ' '))
       <FlightView v-if="ctx === 'vol'" />
       <FootView v-else-if="ctx === 'pied'" />
       <p v-else class="wait">
-        Aucune donnée pour l'instant. Le service doit tourner, et le jeu doit être lancé avec le personnage en jeu.
+        No data yet. The service must be running and the game launched with your character spawned.
       </p>
     </Transition>
   </main>

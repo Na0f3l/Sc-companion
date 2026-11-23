@@ -22,23 +22,23 @@ export function createLiveSource(addr = '127.0.0.1:2942'): Source & { status(): 
   let retry: NodeJS.Timeout | null = null
   let last: unknown = null
   let running = false
-  let status = 'arrêté'
+  let status = 'stopped'
 
   function open(): void {
     if (!running) return
-    status = 'connexion au jeu…'
+    status = 'connecting to game…'
     call = client.TelemetryStream({}) as grpc.ClientReadableStream<unknown>
     call.on('data', (frame: unknown) => {
       last = frame
-      status = 'en direct'
+      status = 'live'
     })
     call.on('error', (err: grpc.ServiceError) => {
       if (err.code === grpc.status.CANCELLED) return
-      status = err.code === grpc.status.UNAVAILABLE ? 'jeu introuvable' : `erreur ${grpc.status[err.code]}`
+      status = err.code === grpc.status.UNAVAILABLE ? 'game not found' : `error ${grpc.status[err.code]}`
       schedule()
     })
     call.on('end', () => {
-      status = 'flux terminé'
+      status = 'stream ended'
       schedule()
     })
   }
@@ -56,7 +56,7 @@ export function createLiveSource(addr = '127.0.0.1:2942'): Source & { status(): 
       if (running) return
       running = true
       open()
-      console.log(`Direct : écoute du jeu sur ${addr}`)
+      console.log(`Live: listening to the game on ${addr}`)
     },
     stop() {
       running = false
@@ -65,7 +65,7 @@ export function createLiveSource(addr = '127.0.0.1:2942'): Source & { status(): 
       call?.cancel()
       call = null
       last = null
-      status = 'arrêté'
+      status = 'stopped'
     },
     latest: () => last,
   }

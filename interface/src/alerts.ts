@@ -98,14 +98,14 @@ const ground = groundImpact() // une seule instance : son état (hystérésis) e
 const RULES: AlertRule[] = [
   { id: 'test', level: 'critical', message: 'Crash imminent', active: () => testAlert.value },
   { id: 'ground-fast', level: 'critical', message: 'Crash imminent', active: () => ground() && fast() },
-  { id: 'collision-fast', level: 'critical', message: 'Collision imminente', active: () => proximity() && fast() },
-  { id: 'ground-slow', level: 'warning', message: 'Sol proche', active: () => ground() && !fast() },
-  { id: 'collision-slow', level: 'warning', message: 'Obstacle proche', active: () => proximity() && !fast() },
-  { id: 'health', level: 'critical', message: 'Santé critique', active: lowVital('health') },
-  { id: 'thirst', level: 'warning', message: 'Déshydratation', active: lowVital('thirst') },
-  { id: 'hunger', level: 'warning', message: 'Sous-alimentation', active: lowVital('hunger') },
+  { id: 'collision-fast', level: 'critical', message: 'Collision imminent', active: () => proximity() && fast() },
+  { id: 'ground-slow', level: 'warning', message: 'Ground proximity', active: () => ground() && !fast() },
+  { id: 'collision-slow', level: 'warning', message: 'Obstacle nearby', active: () => proximity() && !fast() },
+  { id: 'health', level: 'critical', message: 'Critical health', active: lowVital('health') },
+  { id: 'thirst', level: 'warning', message: 'Dehydrated', active: lowVital('thirst') },
+  { id: 'hunger', level: 'warning', message: 'Starving', active: lowVital('hunger') },
   // voyant MISL en rouge : un missile est verrouillé sur le vaisseau
-  { id: 'missile', level: 'critical', message: 'Missile verrouillé', active: () => str(`${VEH}annunciators.misl`) === 'ANNUNCIATOR_STATE_MAJOR_ON' },
+  { id: 'missile', level: 'critical', message: 'Missile lock', active: () => str(`${VEH}annunciators.misl`) === 'ANNUNCIATOR_STATE_MAJOR_ON' },
 ]
 
 const activeAlerts = computed(() => RULES.filter((r) => r.active()))

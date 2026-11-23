@@ -45,7 +45,7 @@ function onFirstClient(): void {
   source.start()
   tick()
   timer = setInterval(tick, TICK_MS)
-  console.log('Écran connecté : diffusion démarrée')
+  console.log('Client connected: broadcasting started')
 }
 
 function onLastClientGone(): void {
@@ -53,7 +53,7 @@ function onLastClientGone(): void {
   timer = null
   source.stop()
   state = {}
-  console.log('Plus aucun écran : diffusion en pause')
+  console.log('No clients left: broadcasting paused')
 }
 
 // ---- Serveurs -------------------------------------------------------------------
@@ -86,4 +86,4 @@ wss.on('connection', (ws) => {
   })
 })
 
-server.listen(PORT, () => console.log(`SC Companion service : http://localhost:${PORT}  (ws /ws, santé /health)`))
+server.listen(PORT, () => console.log(`SC Companion service : http://localhost:${PORT}  (ws /ws, health /health)`))

@@ -11,7 +11,7 @@ type Msg =
   | { type: 'patch'; set: Record<string, Value>; del: string[] }
 
 export const tm = reactive<Record<string, Value>>({})
-export const link = ref<'connexion' | 'en ligne' | 'hors ligne'>('connexion')
+export const link = ref<'connecting' | 'online' | 'offline'>('connecting')
 export const source = ref('')
 
 // ---- Lecture typée (un champ absent = false / 0, comme dans le protocole du jeu) ----
@@ -38,10 +38,10 @@ function clear(): void {
 
 export function connect(): void {
   const ws = new WebSocket(`${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}/ws`)
-  link.value = 'connexion'
+  link.value = 'connecting'
 
   ws.onopen = () => {
-    link.value = 'en ligne'
+    link.value = 'online'
     delay = 500
   }
   ws.onmessage = (e) => {
@@ -56,7 +56,7 @@ export function connect(): void {
     }
   }
   ws.onclose = () => {
-    link.value = 'hors ligne'
+    link.value = 'offline'
     clear()
     setTimeout(connect, delay)
     delay = Math.min(delay * 2, 5000) // 0,5 s, 1 s, 2 s… plafonné à 5 s

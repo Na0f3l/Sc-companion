@@ -15,7 +15,7 @@ export function createReplaySource(target: string): Source {
   const files = fs.statSync(target).isDirectory()
     ? fs.readdirSync(target).filter((f) => f.endsWith('.json')).sort().map((f) => path.join(target, f))
     : [target]
-  if (!files.length) throw new Error(`Aucune capture .json dans ${target}`)
+  if (!files.length) throw new Error(`No .json capture in ${target}`)
 
   // Temps relatifs (ms depuis le début de la boucle) et trames, dans deux tableaux parallèles.
   const times: number[] = []
@@ -32,7 +32,7 @@ export function createReplaySource(target: string): Source {
     offset = times[times.length - 1] + 1000
   }
   const duration = offset
-  console.log(`Rejeu : ${files.length} capture(s), ${frames.length} trames, boucle de ${(duration / 1000).toFixed(0)} s`)
+  console.log(`Replay: ${files.length} capture(s), ${frames.length} frames, ${(duration / 1000).toFixed(0)} s loop`)
 
   let startedAt = 0
   let running = false

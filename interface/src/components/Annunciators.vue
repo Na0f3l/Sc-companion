@@ -3,8 +3,8 @@
 import { str, VEH } from '@/telemetry'
 
 const LIST = [
-  ['pwr', 'Énergie'], ['wpn', 'Armes'], ['thr', 'Propuls.'], ['shld', 'Boucliers'], ['cool', 'Refroid.'],
-  ['qdrv', 'Quantum'], ['radr', 'Radar'], ['prox', 'Proximité'], ['hit', 'Impact'], ['misl', 'Missile'],
+  ['pwr', 'Power'], ['wpn', 'Weapons'], ['thr', 'Thrust'], ['shld', 'Shields'], ['cool', 'Cooling'],
+  ['qdrv', 'Quantum'], ['radr', 'Radar'], ['prox', 'Proximity'], ['hit', 'Hit'], ['misl', 'Missile'],
 ] as const
 
 const SHORT: Record<string, string> = {
