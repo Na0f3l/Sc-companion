@@ -22,6 +22,8 @@ cd interface && npm install && npm run build   # une fois (et après chaque modi
 cd service   && npm install && node src/index.ts  # puis ouvrir http://localhost:2950 (ou http://<ip-du-pc>:2950 sur le téléphone)
 ```
 
+Sans terminal : double-clic sur `Lancer.vbs` (ou un raccourci vers `wscript.exe "…\Lancer.vbs"` avec `icone.ico`). Il démarre le service en arrière-plan s'il ne tourne pas déjà, puis ouvre l'interface ; les messages du service vont dans `service/service.log`. Pour arrêter le service : terminer `node.exe` dans le Gestionnaire des tâches.
+
 Le service sert lui-même l'interface compilée : pas besoin du serveur de développement Vite pour jouer (~500 Mo économisés). `npm run dev` dans `interface/` ne sert qu'à développer.
 
 Options du service : `--replay ../telemetrie/captures` (rejeu de captures), `--game-dir <dossier>` (jeu hors de `…\StarCitizen\LIVE`), `--port <n>`. Le lancer avec `node` directement plutôt que `npm run` (npm garde un processus parent de ~60 Mo).
