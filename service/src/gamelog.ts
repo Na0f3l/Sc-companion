@@ -23,6 +23,11 @@ const MODE_RX = /gamerules="([^"]+)"|Requesting game mode [^/\s"]*\/(\w+)|(<Join
 // Blessures : notifications du HUD, ex. « Minor Injury Detected - Right leg - Tier 3 Treatment Required ».
 // Tier 3 = mineure, 2 = modérée, 1 = grave. Le jeu ne note PAS la guérison : voir clearInjuries().
 const INJURY_RX = /Injury Detected - (Head|Torso|Left arm|Right arm|Left leg|Right leg) - Tier ([123])/g
+// Soin au lit médical : « <MED BED HEAL> … Perform surgery event Success … head: false torso: false leftArm: false
+// rightArm: false leftLeg: false rightLeg: true » (true = partie soignée). Les autres soins (medpen, medgun)
+// n'écrivent rien : pour eux, voir clearInjuries() (santé max revenue à 100).
+const MEDBED_RX = /<MED BED HEAL>.*?surgery event Success.*?head: (true|false) torso: (true|false) leftArm: (true|false) rightArm: (true|false) leftLeg: (true|false) rightLeg: (true|false)/g
+const MEDBED_PARTS = ['head', 'torso', 'left_arm', 'right_arm', 'left_leg', 'right_leg']
 const PART_KEY: Record<string, string> = {
   Head: 'head', Torso: 'torso', 'Left arm': 'left_arm', 'Right arm': 'right_arm', 'Left leg': 'left_leg', 'Right leg': 'right_leg',
 }
@@ -82,8 +87,20 @@ export function createGameLogReader(gameDir = DEFAULT_DIR) {
     const lines = cut >= 0 ? text.slice(0, cut) : ''
     const found = lastMode(lines)
     if (found) mode = found
+    // blessures et soins dans l'ordre du log : une blessure soignée puis reprise reste affichée
+    const events: [number, () => void][] = []
     INJURY_RX.lastIndex = 0
-    for (let m = INJURY_RX.exec(lines); m; m = INJURY_RX.exec(lines)) injuries.set(PART_KEY[m[1]!]!, { tier: Number(m[2]), at: Date.now() })
+    for (let m = INJURY_RX.exec(lines); m; m = INJURY_RX.exec(lines)) {
+      const part = PART_KEY[m[1]!]!
+      const tier = Number(m[2])
+      events.push([m.index, () => injuries.set(part, { tier, at: Date.now() })])
+    }
+    MEDBED_RX.lastIndex = 0
+    for (let m = MEDBED_RX.exec(lines); m; m = MEDBED_RX.exec(lines)) {
+      const healed = MEDBED_PARTS.filter((_, i) => m![i + 1] === 'true')
+      events.push([m.index, () => healed.forEach((p) => injuries.delete(p))])
+    }
+    events.sort((a, b) => a[0] - b[0]).forEach(([, apply]) => apply())
   }
 
   return {
