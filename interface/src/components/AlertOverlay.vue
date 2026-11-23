@@ -1,5 +1,5 @@
 <script setup lang="ts">
-// Voile d'alerte plein écran : apparaît, le fond clignote 2 fois, reste 3 s, disparaît seul.
+// Voile d'alerte plein écran : apparaît, le fond bat 3 fois en 1,5 s, puis disparaît seul.
 // Aucune interaction nécessaire (pointer-events: none : il ne bloque jamais l'écran).
 import { shownAlert } from '@/alerts'
 </script>
@@ -45,7 +45,7 @@ import { shownAlert } from '@/alerts'
     inset: 0;
     z-index: -1;
     background: radial-gradient(ellipse at center, rgb(var(--glow) / 25%) 0%, rgb(var(--glow) / 70%) 100%);
-    animation: pulse 0.5s ease-out infinite; // 6 battements pendant les 3 s
+    animation: pulse 0.5s ease-out 3; // 3 battements = 1,5 s = DISPLAY_MS
   }
 }
 

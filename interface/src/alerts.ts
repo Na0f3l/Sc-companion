@@ -3,7 +3,7 @@
 // Une alerte = une règle : un identifiant, un niveau, un message et une condition calculée
 // à partir de la télémétrie. Pour en ajouter une, il suffit d'ajouter une ligne dans RULES.
 //
-// Aucune interaction : quand une condition DEVIENT vraie, l'alerte s'affiche 3 s puis disparaît seule.
+// Aucune interaction : quand une condition DEVIENT vraie, l'alerte s'affiche 1,5 s puis disparaît seule.
 // Si plusieurs se déclenchent en même temps, elles passent l'une après l'autre.
 // Une alerte qui reste vraie ne se réaffiche pas ; si elle redevient fausse puis vraie, oui.
 import { computed, ref, watch } from 'vue'
@@ -19,7 +19,7 @@ export interface AlertRule {
   active: () => boolean
 }
 
-export const DISPLAY_MS = 3000
+export const DISPLAY_MS = 1500 // durée d'affichage d'une alerte (3 battements de 0,5 s, voir AlertOverlay)
 
 // Alerte de test : déclenchée par le bouton de l'en-tête, retombe d'elle-même
 const testAlert = ref(false)
