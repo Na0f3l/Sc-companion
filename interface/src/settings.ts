@@ -18,12 +18,25 @@ export const ALERT_GROUPS = [
 ] as const
 export type AlertGroup = (typeof ALERT_GROUPS)[number]['key']
 
+/** Composants surveillés par l'alerte « Component damaged », activables un par un (clé = voyant du jeu). */
+export const COMPONENT_ALERTS = [
+  { key: 'pwr', label: 'Power plant' },
+  { key: 'thr', label: 'Thrusters' },
+  { key: 'wpn', label: 'Weapons' },
+  { key: 'cool', label: 'Coolers' },
+  { key: 'radr', label: 'Radar' },
+  { key: 'shld', label: 'Shields' },
+] as const
+export type ComponentKey = (typeof COMPONENT_ALERTS)[number]['key']
+
 interface Settings {
   alerts: Record<AlertGroup, boolean>
+  components: Record<ComponentKey, boolean>
 }
 
 const DEFAULTS: Settings = {
   alerts: Object.fromEntries(ALERT_GROUPS.map((g) => [g.key, true])) as Record<AlertGroup, boolean>,
+  components: Object.fromEntries(COMPONENT_ALERTS.map((c) => [c.key, true])) as Record<ComponentKey, boolean>,
 }
 
 const KEY = 'sc-companion.settings'
@@ -32,7 +45,12 @@ const KEY = 'sc-companion.settings'
 function load(): Settings {
   try {
     const saved = JSON.parse(localStorage.getItem(KEY) ?? '{}') as Partial<Settings>
-    return { ...DEFAULTS, ...saved, alerts: { ...DEFAULTS.alerts, ...saved.alerts } }
+    return {
+      ...DEFAULTS,
+      ...saved,
+      alerts: { ...DEFAULTS.alerts, ...saved.alerts },
+      components: { ...DEFAULTS.components, ...saved.components },
+    }
   } catch {
     return structuredClone(DEFAULTS)
   }
@@ -53,3 +71,4 @@ watch(
 )
 
 export const alertEnabled = (g: AlertGroup): boolean => settings.alerts[g]
+export const componentAlertEnabled = (c: ComponentKey): boolean => settings.alerts.components && settings.components[c]

@@ -12,7 +12,7 @@
 import { computed, shallowRef, watch } from 'vue'
 import { ACT, FLI, NO_VALUE, VEH, annunciator, bool, has, num, str } from './telemetry'
 import { playAlert } from './sound'
-import { type AlertGroup, alertEnabled } from './settings'
+import { type AlertGroup, alertEnabled, componentAlertEnabled } from './settings'
 import { flash } from './hit'
 
 export type AlertLevel = 'critical' | 'warning'
@@ -252,7 +252,7 @@ for (const c of COMPONENTS) {
     () => SEVERITY[annunciator(c.ann)],
     (now, before) => {
       if (now <= before || !poweredSince || performance.now() - poweredSince < POWER_SETTLE_MS) return
-      if (!alertEnabled('components')) return
+      if (!componentAlertEnabled(c.ann)) return
       const major = now === 2
       pushAlert({ id: `comp-${c.ann}-${now}`, level: major ? 'critical' : 'warning', message: `${c.name} ${major ? 'critical' : 'damaged'}` })
       if (alertEnabled('hit')) flash()

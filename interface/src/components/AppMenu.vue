@@ -5,7 +5,7 @@
 import { onBeforeUnmount, ref, watch } from 'vue'
 import { TESTS, type TestKind, shownAlert, triggerTest } from '@/alerts'
 import { flash } from '@/hit'
-import { ALERT_GROUPS, settings } from '@/settings'
+import { ALERT_GROUPS, COMPONENT_ALERTS, settings } from '@/settings'
 
 const open = ref(false)
 const testsOpen = ref(false)
@@ -35,6 +35,21 @@ const allOn = () => ALERT_GROUPS.every((g) => settings.alerts[g.key])
 function toggleAll(): void {
   const v = !allOn()
   for (const g of ALERT_GROUPS) settings.alerts[g.key] = v
+  setComponents(v)
+}
+
+// « Component damaged » : la case principale coche / décoche tous les composants ; la flèche déplie la liste.
+// À moitié cochée quand seuls certains composants sont actifs.
+const compOpen = ref(false)
+const compCount = () => COMPONENT_ALERTS.filter((c) => settings.components[c.key]).length
+const compPartial = () => settings.alerts.components && compCount() > 0 && compCount() < COMPONENT_ALERTS.length
+function setComponents(v: boolean): void {
+  settings.alerts.components = v
+  for (const c of COMPONENT_ALERTS) settings.components[c.key] = v
+}
+// un composant coché rallume l'alerte ; le dernier décoché l'éteint
+function onComponent(): void {
+  settings.alerts.components = compCount() > 0
 }
 </script>
 
@@ -51,11 +66,38 @@ function toggleAll(): void {
           <span>Alerts</span>
           <button type="button" class="link" @click="toggleAll">{{ allOn() ? 'None' : 'All' }}</button>
         </header>
-        <label v-for="g in ALERT_GROUPS" :key="g.key" class="check">
-          <input v-model="settings.alerts[g.key]" type="checkbox" />
-          <span class="box" aria-hidden="true" />
-          {{ g.label }}
-        </label>
+        <template v-for="g in ALERT_GROUPS" :key="g.key">
+          <!-- Component damaged : case principale + flèche qui déplie un réglage par composant -->
+          <template v-if="g.key === 'components'">
+            <div class="with-sub">
+              <label class="check">
+                <input
+                  type="checkbox"
+                  :checked="settings.alerts.components"
+                  :indeterminate="compPartial()"
+                  @change="setComponents(($event.target as HTMLInputElement).checked)"
+                />
+                <span class="box" :class="{ partial: compPartial() }" aria-hidden="true" />
+                {{ g.label }}
+              </label>
+              <button type="button" class="arrow" :aria-expanded="compOpen" aria-label="Show components" @click="compOpen = !compOpen">
+                <span class="caret" :class="{ side: !compOpen }">▾</span>
+              </button>
+            </div>
+            <div v-if="compOpen" class="subchecks">
+              <label v-for="c in COMPONENT_ALERTS" :key="c.key" class="check">
+                <input v-model="settings.components[c.key]" type="checkbox" @change="onComponent" />
+                <span class="box" aria-hidden="true" />
+                {{ c.label }}
+              </label>
+            </div>
+          </template>
+          <label v-else class="check">
+            <input v-model="settings.alerts[g.key]" type="checkbox" />
+            <span class="box" aria-hidden="true" />
+            {{ g.label }}
+          </label>
+        </template>
       </section>
 
       <!-- Tests : sous-liste dépliable -->
@@ -200,9 +242,40 @@ header {
     box-shadow: inset 0 0 0 2px var(--panel);
   }
 
+  // à moitié cochée : un trait au milieu
+  .box.partial {
+    border-color: var(--cyan);
+    background: linear-gradient(var(--cyan), var(--cyan)) center / 6px 2px no-repeat;
+  }
+
   &:has(input:not(:checked)) {
     color: var(--muted);
   }
+}
+
+.with-sub {
+  display: flex;
+  align-items: center;
+
+  .check {
+    flex: 1;
+  }
+}
+
+.arrow {
+  padding: 6px 8px;
+  border: 0;
+  background: none;
+  color: var(--muted);
+  cursor: pointer;
+
+  &:hover {
+    color: var(--cyan);
+  }
+}
+
+.subchecks {
+  padding-left: 18px;
 }
 
 .row,
