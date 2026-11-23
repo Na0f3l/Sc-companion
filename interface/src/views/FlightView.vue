@@ -71,15 +71,19 @@ const countermeasures = computed(() => {
   return out
 })
 
-// ---- Systèmes (l'alimentation des composants est dans Diagnostics) ----
-const IFCS = [
-  ['ifcs_coupled', 'Coupled'], ['ifcs_stability', 'Stability'], ['ifcs_gravity_compensation', 'Grav. comp.'],
-  ['ifcs_proximity_assist', 'Prox. assist'], ['ifcs_esp', 'ESP'], ['ifcs_speed_limiter', 'Limiter'],
-] as const
+// ---- États du vaisseau, abrégés comme sur le HUD du jeu (affichés seulement quand actifs) ----
 // un réglage est « actif » s'il est actif, ou à défaut activé (certains n'envoient que enabled)
 const ifcsOn = (k: string) => bool(`${VEH}flight.settings.${k}.active`) || bool(`${VEH}flight.settings.${k}.enabled`)
+const FLAGS: [label: string, on: () => boolean, title: string][] = [
+  ['CPLD', () => ifcsOn('ifcs_coupled'), 'Coupled'],
+  ['ESP', () => ifcsOn('ifcs_esp'), 'Enhanced stick precision'],
+  ['LIGHT', () => bool(VEH + 'lights_enabled'), 'Lights'],
+  ['CRUISE', () => ifcsOn('ifcs_cruise_mode'), 'Cruise control'],
+  ['LIM', () => ifcsOn('ifcs_speed_limiter'), 'Speed limiter'],
+]
+const flags = computed(() => FLAGS.filter(([, on]) => on()))
 
-const GEAR: Record<string, string> = { DEPLOYED: 'Down', RETRACTED: 'Up', RETRACTING: 'Retracting', DEPLOYING: 'Deploying' }
+// Train : icône rouge sorti, orange clignotante en mouvement, rien quand il est rentré (comme en jeu)
 const gear = computed(() => str(`${VEH}flight.state.gear`).replace('VEHICLE_COMPONENT_DEPLOYMENT_STATE_', ''))
 
 // ---- Pilote ----
@@ -93,27 +97,44 @@ const role = computed(() => {
 <template>
   <section class="screens">
     <MfdPanel title="Flight instruments" source="flight.instruments" tab="FLIGHT">
-      <!-- vitesse et boost côte à côte, comme le HUD du jeu -->
-      <!-- mode de vol, en haut à gauche du module vitesse / boost -->
-      <div v-if="mode" class="mode" :title="mode.guessed ? 'Deduced from the quantum drive indicator' : ''">
-        <span class="badge" :class="mode.label.toLowerCase()">{{ mode.label }}</span>
-      </div>
-      <div class="pair">
-        <VBar
-          :value="Math.abs(speed) / SPEED_MAX"
-          :zones="SPEED_ZONES"
-          :reverse="speed < 0"
-          :reading="Math.round(Math.abs(speed)).toString()"
-          label="m/s"
-        />
-        <VBar
-          :value="num(FLI + 'boost.reserves')"
-          :zones="BOOST_ZONES"
-          :reading="`${Math.round(num(FLI + 'boost.reserves') * 100)}%`"
-          label="Boost"
-        >
-          <span class="chip" :class="{ hot: bool(FLI + 'boost.engaged') }">AB</span>
-        </VBar>
+      <!-- vitesse et boost serrés à gauche, états du vaisseau à droite (comme le HUD du jeu) -->
+      <div class="top">
+        <div class="pair">
+          <VBar
+            :value="Math.abs(speed) / SPEED_MAX"
+            :zones="SPEED_ZONES"
+            :reverse="speed < 0"
+            :reading="Math.round(Math.abs(speed)).toString()"
+            label="m/s"
+          />
+          <VBar
+            :value="num(FLI + 'boost.reserves')"
+            :zones="BOOST_ZONES"
+            :reading="`${Math.round(num(FLI + 'boost.reserves') * 100)}%`"
+            label="Boost"
+          >
+            <span class="chip" :class="{ hot: bool(FLI + 'boost.engaged') }">AB</span>
+          </VBar>
+        </div>
+        <div class="hud">
+          <span v-if="mode" class="badge" :class="mode.label.toLowerCase()" :title="mode.guessed ? 'Deduced from the quantum drive indicator' : ''">
+            {{ mode.label }}
+          </span>
+          <svg
+            v-if="gear && gear !== 'RETRACTED'"
+            viewBox="0 0 24 24"
+            class="gear"
+            :class="{ moving: gear.endsWith('ING') }"
+            role="img"
+            :aria-label="'Landing gear ' + gear.toLowerCase()"
+          >
+            <title>Landing gear {{ gear.toLowerCase() }}</title>
+            <path d="M8 3v6M5 3h6M15 4v10M12 11l3 3 3-3" />
+            <circle cx="8" cy="14" r="4" />
+            <circle cx="8" cy="14" r="1.2" />
+          </svg>
+          <span v-for="[label, , title] in flags" :key="label" class="flag" :title="title">{{ label }}</span>
+        </div>
       </div>
       <!-- .masked : invisible mais garde sa place, donc rien ne bouge quand ça apparaît / disparaît -->
       <HeadingTape :heading="num(FLI + 'heading')" :class="{ masked: !nearPlanet }" />
@@ -183,22 +204,6 @@ const role = computed(() => {
       </div>
     </MfdPanel>
 
-    <MfdPanel title="Systems" source="flight.state · flight.settings" tab="IFCS">
-      <div class="cols">
-        <div class="stack">
-          <span class="lbl">Gear</span>
-          <span class="state" :class="{ warn: gear.endsWith('ING') }">{{ GEAR[gear] ?? '—' }}</span>
-        </div>
-        <div class="stack">
-          <span class="lbl">Status</span>
-          <span class="state">{{ bool(VEH + 'flight.state.is_landed') ? 'Landed' : 'Airborne' }}</span>
-        </div>
-      </div>
-      <div class="chips">
-        <span v-for="[k, label] in IFCS" :key="k" class="chip" :class="{ on: ifcsOn(k) }">{{ label }}</span>
-      </div>
-    </MfdPanel>
-
     <MfdPanel title="Pilot" source="actor.vitals" tab="CREW">
       <VitalRings />
       <div class="cols">
@@ -228,8 +233,55 @@ const role = computed(() => {
   visibility: hidden;
 }
 
-.mode {
-  margin-bottom: -6px;
+.top {
+  --vbar-h: 120px; // barres un peu plus courtes : moins de hauteur pour le panneau
+  display: flex;
+  align-items: flex-start;
+  gap: 20px;
+}
+
+.pair {
+  display: flex;
+  gap: 14px;
+}
+
+// colonne d'états : badges encadrés comme sur le HUD du jeu
+.hud {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+  padding-top: 2px;
+}
+
+.flag {
+  padding: 2px 7px;
+  border: 1px solid var(--cyan-dim);
+  border-radius: 3px;
+  color: var(--cyan);
+  font: 600 12px var(--font-num);
+  letter-spacing: 0.14em;
+}
+
+.gear {
+  width: 22px;
+  height: 22px;
+  fill: none;
+  stroke: var(--red);
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+
+  &.moving {
+    stroke: var(--amber);
+    animation: blink 0.5s steps(2) infinite;
+  }
+}
+
+@keyframes blink {
+  50% {
+    opacity: 0.35;
+  }
 }
 
 .badge {
@@ -244,12 +296,6 @@ const role = computed(() => {
     border-color: var(--amber);
     color: var(--amber);
   }
-}
-
-.pair {
-  display: flex;
-  justify-content: space-evenly;
-  align-items: flex-start;
 }
 
 // H-Fuel / Q-Fuel alignés par le haut : la ligne « coming soon » sous Q-Fuel ne décale pas sa jauge
