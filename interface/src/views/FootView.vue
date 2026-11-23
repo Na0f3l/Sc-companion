@@ -1,49 +1,76 @@
 <script setup lang="ts">
-// Écrans affichés quand le personnage est à pied.
+// Écrans affichés quand le personnage est à pied. Pictos et jauges inspirés de l'écran Santé / Environnement du jeu.
 import { computed } from 'vue'
 import { ACT, bool, num, str } from '@/telemetry'
 import MfdPanel from '@/components/MfdPanel.vue'
 import Sparkline from '@/components/Sparkline.vue'
 import VitalRings from '@/components/VitalRings.vue'
+import HudTile from '@/components/HudTile.vue'
+import HudIcon from '@/components/HudIcon.vue'
+import ArcMeter from '@/components/ArcMeter.vue'
+import SpectrumDial from '@/components/SpectrumDial.vue'
 
 const fr = new Intl.NumberFormat('fr-FR')
 const V = `${ACT}vitals.`
+const E = `${ACT}environment.`
+const clamp01 = (x: number) => Math.min(1, Math.max(0, x))
+
+// ---- Santé ----
+const bodyTemp = computed(() => num(V + 'body_temperature.current'))
+const heart = computed(() => num(V + 'heart_rate'))
+const o2 = computed(() => num(V + 'oxygen.current') / (num(V + 'oxygen.max', 1) || 1))
+// intoxication_level : absent quand il vaut 0 (le jeu n'envoie pas les zéros). Échelle supposée 0 → 100.
+const intox = computed(() => clamp01(num(V + 'intoxication_level') / 100))
+
+// ---- Environnement ----
+const gravity = computed(() => num(V + 'gravity'))
+const breathable = computed(() => bool(E + 'breathable_atmosphere'))
+const hPa = computed(() => num(V + 'pressure') * 1013.25) // le jeu envoie des atmosphères, son HUD affiche des hPa
+const extTemp = computed(() => num(E + 'external_temperature'))
+const radiation = computed(() => num(E + 'ambient_radiation_rate'))
+
 const LOCO: Record<string, string> = { ON_FOOT: 'À pied', SEATED: 'Assis' }
 const loco = computed(() => LOCO[str(`${ACT}state.locomotion`).replace('ACTOR_LOCOMOTION_STATE_', '')] ?? '—')
 </script>
 
 <template>
   <section class="screens">
-    <MfdPanel title="Biométrie" source="actor.vitals" tab="SANTÉ">
+    <MfdPanel class="wide" title="Santé" source="actor.vitals" tab="SANTÉ">
       <VitalRings />
-      <div class="row">
-        <span class="lbl">Rythme cardiaque</span>
-        <span class="num mid">{{ Math.round(num(V + 'heart_rate')) }}<span class="unit">bpm</span></span>
+      <div class="tiles">
+        <HudTile :value="`${Math.round(bodyTemp)} °C`" label="Temp. corps" :tone="bodyTemp > 38.5 || bodyTemp < 35 ? 'warn' : 'ok'">
+          <HudIcon name="body-temp" />
+        </HudTile>
+        <HudTile :value="`${Math.round(heart)} bpm`" label="Cardio" :tone="heart > 150 ? 'warn' : 'ok'">
+          <HudIcon name="heart" />
+        </HudTile>
+        <HudTile :value="`${Math.round(o2 * 100)} %`" label="Oxygène" :tone="o2 < 0.3 ? 'crit' : 'ok'">
+          <ArcMeter :value="o2" color="#3b82f6"><span class="o2">O<sub>2</sub></span></ArcMeter>
+        </HudTile>
+        <HudTile :value="`${Math.round(intox * 100)} %`" label="Drogues" :tone="intox > 0.6 ? 'crit' : intox > 0.3 ? 'warn' : 'ok'">
+          <ArcMeter :value="intox" color="#f97316"><HudIcon name="pills" /></ArcMeter>
+        </HudTile>
       </div>
-      <Sparkline :value="num(V + 'heart_rate')" :min="40" :max="140" />
-      <div class="cols">
-        <div class="stack">
-          <span class="lbl">Oxygène</span>
-          <span class="num mid">{{ Math.round(num(V + 'oxygen.current') * 100) }}<span class="unit">%</span></span>
-        </div>
-        <div class="stack">
-          <span class="lbl">Temp. corps</span>
-          <span class="num mid">{{ num(V + 'body_temperature.current').toFixed(1) }}<span class="unit">°C</span></span>
-        </div>
-      </div>
+      <Sparkline :value="heart" :min="40" :max="160" />
     </MfdPanel>
 
-    <MfdPanel title="Environnement" source="actor.environment" tab="ENVIRONNEMENT">
-      <div class="list">
-        <div><span class="lbl">Temp. extérieure</span><span class="num">{{ Math.round(num(ACT + 'environment.external_temperature')) }} °C</span></div>
-        <div>
-          <span class="lbl">Air respirable</span>
-          <span class="state" :class="{ warn: !bool(ACT + 'environment.breathable_atmosphere') }">
-            {{ bool(ACT + 'environment.breathable_atmosphere') ? 'Oui' : 'Non' }}
-          </span>
-        </div>
-        <div><span class="lbl">Gravité</span><span class="num">{{ num(V + 'gravity').toFixed(2) }} g</span></div>
-        <div><span class="lbl">Pression</span><span class="num">{{ num(V + 'pressure').toFixed(2) }} atm</span></div>
+    <MfdPanel class="wide" title="Environnement" source="actor.environment" tab="ENVIRONNEMENT">
+      <div class="tiles">
+        <HudTile :value="`${gravity.toFixed(2)} G`" label="Gravité">
+          <HudIcon name="gravity" />
+        </HudTile>
+        <HudTile :value="breathable ? 'Sain' : 'Toxique'" label="Atmosphère" :tone="breathable ? 'good' : 'crit'">
+          <HudIcon name="lungs" />
+        </HudTile>
+        <HudTile :value="`${Math.round(hPa)} hPa`" label="Pression">
+          <SpectrumDial :value="hPa / 2026"><HudIcon name="pressure" /></SpectrumDial>
+        </HudTile>
+        <HudTile :value="`${Math.round(extTemp)} °C`" label="Température">
+          <SpectrumDial :value="(extTemp + 60) / 160"><HudIcon name="ext-temp" /></SpectrumDial>
+        </HudTile>
+        <HudTile :value="`${radiation.toFixed(radiation < 10 ? 1 : 0)} R/s`" label="Radiations" :tone="radiation > 0 ? 'warn' : 'ok'">
+          <SpectrumDial :value="radiation / 5"><HudIcon name="radiation" /></SpectrumDial>
+        </HudTile>
       </div>
     </MfdPanel>
 
@@ -56,3 +83,19 @@ const loco = computed(() => LOCO[str(`${ACT}state.locomotion`).replace('ACTOR_LO
     </MfdPanel>
   </section>
 </template>
+
+<style scoped lang="scss">
+.tiles {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(68px, 1fr));
+  gap: 8px;
+}
+
+.o2 {
+  font: 700 15px var(--font-num);
+
+  sub {
+    font-size: 9px;
+  }
+}
+</style>
