@@ -48,30 +48,32 @@ small {
   opacity: 0.8;
 }
 
-[data-s='off'] {
+// « .ann > » : même précision que la règle de base des tuiles (.ann > div), sinon celle-ci gagne
+// et les états orange / rouge ne s'affichent jamais.
+.ann > [data-s='off'] {
   opacity: 0.45;
 }
 
-[data-s='nominal'] {
+.ann > [data-s='nominal'] {
   color: var(--cyan);
   border-color: var(--cyan-dim);
 }
 
-[data-s='minor'] {
+.ann > [data-s='minor'] {
   color: var(--bg);
   background: var(--amber);
   border-color: var(--amber);
 }
 
 // Clignotement par opacity + steps : pas d'interpolation, très peu de calcul.
-[data-s='major'] {
+.ann > [data-s='major'] {
   color: #fff;
   background: var(--red);
   border-color: var(--red);
   animation: blink 0.5s steps(2) infinite;
 }
 
-.flash {
+.ann > .flash {
   animation: blink 0.5s steps(2) infinite;
 }
 

@@ -155,7 +155,7 @@ const folded = reactive<Record<string, boolean>>({})
 // Seul sur sa ligne (téléphone, une colonne), la liste garde une hauteur confortable.
 .scroll {
   position: relative;
-  min-height: 80px;
+  min-height: 170px; // au moins 4 composants visibles
 
   @media (max-width: 640px) {
     min-height: 260px;

@@ -288,7 +288,7 @@ const role = computed(() => {
 // écarts minimaux. :deep(.body) = le contenu de MfdPanel.
 .crew :deep(.body) {
   align-content: start;
-  gap: 8px;
+  gap: 16px; // un peu d'air entre les jauges et la ligne coeur / O2 / siège
 }
 
 // trois valeurs côte à côte, libellé collé à la valeur
@@ -301,10 +301,15 @@ const role = computed(() => {
     gap: 0;
   }
 
+  // libellé collé à sa valeur
+  .lbl {
+    line-height: 1;
+  }
+
   .num,
   .state {
     font-size: 14px;
-    line-height: 1.3;
+    line-height: 1.15;
   }
 }
 
