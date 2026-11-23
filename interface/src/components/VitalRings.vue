@@ -1,5 +1,6 @@
 <script setup lang="ts">
 // Santé, faim, soif côte à côte : utilisé à pied et dans l'écran pilote.
+// Mêmes seuils pour les trois : orange sous 50 %, rouge sous 25 % (alerte plein écran à 25 %, voir alerts.ts).
 import { computed } from 'vue'
 import { ACT, num } from '@/telemetry'
 import RingGauge from './RingGauge.vue'
@@ -9,14 +10,15 @@ const ratio = (k: string) => num(V + k + '.current') / (num(V + k + '.max', 100)
 const health = computed(() => ratio('health'))
 const hunger = computed(() => ratio('hunger'))
 const thirst = computed(() => ratio('thirst'))
+const WARN = 0.5
+const CRIT = 0.25
 </script>
 
 <template>
   <div class="rings">
-    <!-- santé : orange sous 50 %, rouge sous 25 % -->
-    <RingGauge :value="health" icon="health" label="Santé" :warn-at="0.5" :crit-at="0.25" />
-    <RingGauge :value="hunger" icon="hunger" label="Faim" />
-    <RingGauge :value="thirst" icon="thirst" label="Soif" />
+    <RingGauge :value="health" icon="health" label="Santé" :warn-at="WARN" :crit-at="CRIT" />
+    <RingGauge :value="hunger" icon="hunger" label="Faim" :warn-at="WARN" :crit-at="CRIT" />
+    <RingGauge :value="thirst" icon="thirst" label="Soif" :warn-at="WARN" :crit-at="CRIT" />
   </div>
 </template>
 

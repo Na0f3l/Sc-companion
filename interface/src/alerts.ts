@@ -7,7 +7,7 @@
 // Si plusieurs se déclenchent en même temps, elles passent l'une après l'autre.
 // Une alerte qui reste vraie ne se réaffiche pas ; si elle redevient fausse puis vraie, oui.
 import { computed, ref, watch } from 'vue'
-import { VEH, str } from './telemetry'
+import { ACT, VEH, has, num, str } from './telemetry'
 
 export type AlertLevel = 'critical' | 'warning'
 
@@ -27,8 +27,25 @@ export function triggerTest(): void {
   setTimeout(() => (testAlert.value = false), DISPLAY_MS + 200)
 }
 
+// Seuil bas avec hystérésis : vrai sous `on`, ne redevient faux qu'au-dessus de `off`.
+// Évite une alerte en boucle quand la valeur oscille autour du seuil.
+// Faux si le champ n'est pas reçu (jeu fermé, hors ligne) : une valeur absente n'est pas « 0 % ».
+function lowVital(name: string, on = 0.25, off = 0.3): () => boolean {
+  let low = false
+  return () => {
+    const k = `${ACT}vitals.${name}.current`
+    if (!has(k)) return (low = false)
+    const ratio = num(k) / (num(`${ACT}vitals.${name}.max`, 100) || 100)
+    low = low ? ratio < off : ratio < on
+    return low
+  }
+}
+
 const RULES: AlertRule[] = [
   { id: 'test', level: 'critical', message: 'Crash imminent', active: () => testAlert.value },
+  { id: 'health', level: 'critical', message: 'Santé critique', active: lowVital('health') },
+  { id: 'thirst', level: 'warning', message: 'Déshydratation', active: lowVital('thirst') },
+  { id: 'hunger', level: 'warning', message: 'Sous-alimentation', active: lowVital('hunger') },
   // voyant MISL en rouge : un missile est verrouillé sur le vaisseau
   { id: 'missile', level: 'critical', message: 'Missile verrouillé', active: () => str(`${VEH}annunciators.misl`) === 'ANNUNCIATOR_STATE_MAJOR_ON' },
 ]
