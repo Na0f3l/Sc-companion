@@ -82,12 +82,6 @@ body {
 .screens > .wide { grid-column: span 2; }
 @media (max-width: 620px) { .screens > .wide { grid-column: auto; } }
 
-// Respect du réglage système « réduire les animations » (et économie de calcul).
-@media (prefers-reduced-motion: reduce) {
-  *,
-  *::before,
-  *::after {
-    animation: none !important;
-    transition: none !important;
-  }
-}
+// Pas de coupure globale des animations avec prefers-reduced-motion : Windows l'active dès que
+// « Effets d'animation » est désactivé, ce qui supprimait les alertes et le lissage des instruments.
+// Ici le mouvement porte de l'information ; il reste léger (opacity / transform uniquement).
