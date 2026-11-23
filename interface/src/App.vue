@@ -2,7 +2,7 @@
 // Page principale : choisit les écrans selon le contexte du personnage (à pied / aux commandes).
 import { computed, onMounted, watchEffect } from 'vue'
 import { ACT, VEH, connect, has, link, source, str } from './telemetry'
-import { alertLevel, testAlert } from './alerts'
+import { alertLevel, shownAlert, triggerTest } from './alerts'
 import FlightView from './views/FlightView.vue'
 import FootView from './views/FootView.vue'
 import AlertOverlay from './components/AlertOverlay.vue'
@@ -33,9 +33,7 @@ const ship = computed(() => str(`${VEH}class_name`).replaceAll('_', ' '))
         <template v-else>En attente du jeu…</template>
       </div>
       <div class="feed">{{ link }}<template v-if="source"> · {{ source === 'replay' ? 'rejeu de capture' : 'jeu en direct' }}</template></div>
-      <button type="button" class="test" :class="{ on: testAlert }" @click="testAlert = !testAlert">
-        {{ testAlert ? 'Arrêter le test' : 'Tester l’alerte' }}
-      </button>
+      <button type="button" class="test" :disabled="!!shownAlert" @click="triggerTest">Tester l’alerte</button>
     </header>
 
     <AlertOverlay />
@@ -122,10 +120,14 @@ const ship = computed(() => str(`${VEH}class_name`).replaceAll('_', ' '))
   text-transform: uppercase;
   cursor: pointer;
 
-  &:hover,
-  &.on {
+  &:hover:not(:disabled) {
     border-color: var(--cyan-dim);
     color: var(--cyan);
+  }
+
+  &:disabled {
+    opacity: 0.5;
+    cursor: default;
   }
 
   &:focus-visible {

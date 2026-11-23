@@ -9,16 +9,26 @@ const props = withDefaults(
     icon: 'health' | 'hunger' | 'thirst'
     label: string
     alert?: 'low' | 'high' | 'none'
+    warnAt?: number // seuil orange (sous ce seuil en mode low, au-dessus en mode high)
+    critAt?: number // seuil rouge
   }>(),
-  { alert: 'low' },
+  { alert: 'low', warnAt: undefined, critAt: undefined },
 )
 
 const pct = computed(() => Math.round(Math.min(1, Math.max(0, props.value)) * 100))
 const dash = computed(() => `${pct.value} 100`)
 const level = computed(() => {
   const v = props.value
-  if (props.alert === 'low') return v < 0.15 ? 'crit' : v < 0.3 ? 'warn' : 'ok'
-  if (props.alert === 'high') return v > 0.8 ? 'crit' : v > 0.55 ? 'warn' : 'ok'
+  if (props.alert === 'low') {
+    const warn = props.warnAt ?? 0.3
+    const crit = props.critAt ?? 0.15
+    return v < crit ? 'crit' : v < warn ? 'warn' : 'ok'
+  }
+  if (props.alert === 'high') {
+    const warn = props.warnAt ?? 0.55
+    const crit = props.critAt ?? 0.8
+    return v > crit ? 'crit' : v > warn ? 'warn' : 'ok'
+  }
   return 'ok'
 })
 </script>

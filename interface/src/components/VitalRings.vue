@@ -13,7 +13,8 @@ const thirst = computed(() => ratio('thirst'))
 
 <template>
   <div class="rings">
-    <RingGauge :value="health" icon="health" label="Santé" />
+    <!-- santé : orange sous 50 %, rouge sous 25 % -->
+    <RingGauge :value="health" icon="health" label="Santé" :warn-at="0.5" :crit-at="0.25" />
     <RingGauge :value="hunger" icon="hunger" label="Faim" />
     <RingGauge :value="thirst" icon="thirst" label="Soif" />
   </div>
