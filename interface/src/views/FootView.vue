@@ -21,8 +21,9 @@ const heart = computed(() => num(V + 'heart_rate'))
 const o2 = computed(() => num(V + 'oxygen.current') / (num(V + 'oxygen.max', 1) || 1))
 // intoxication_level : absent quand il vaut 0 (le jeu n'envoie pas les zéros). Échelle supposée 0 → 100.
 const intox = computed(() => clamp01(num(V + 'intoxication_level') / 100))
-// Affichage à une décimale, arrondi vers le bas comme le jeu (0,57 → 0.5 %)
-const intoxPct = computed(() => (Math.floor(intox.value * 1000 + 1e-6) / 10).toFixed(1))
+// Le jeu affiche une décimale (1.1 %) mais le champ est un ENTIER (int32) : jamais vu autre chose que
+// absent (= 0) en LIVE 4.10, même avec 1,1 % en jeu. Affiché tel quel, sans décimale inventée.
+const intoxPct = computed(() => Math.round(intox.value * 100))
 
 // ---- Environnement ----
 const gravity = computed(() => num(V + 'gravity'))
