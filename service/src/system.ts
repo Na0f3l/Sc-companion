@@ -5,11 +5,11 @@
 //    sans ouvrir de handle sur le processus (compatible anti-triche) ;
 //  - K32GetPerformanceInfo : mémoire engagée du système / limite, RAM disponible ;
 //  - GetSystemTimes : charge CPU ;
-//  - nvml.dll (installée avec le pilote NVIDIA) : charge, température et VRAM du GPU.
+//  - compteurs de performance Windows (pdh.dll) : charge GPU et VRAM utilisée.
 //
-// Une mesure par seconde, uniquement quand un écran est connecté. Historique borné à 120 s.
+// Une mesure toutes les 2 s, uniquement quand un écran est connecté. Historique borné à 120 s.
 import koffi from 'koffi'
-import type { Flat } from './flat.ts'
+import { flatten, type Flat } from './flat.ts'
 
 // ---- Réglages (repris de memoire/app/reglages.json) ----------------------------------
 const LEAK_RATE = 100 // Mo/s : pente 15 s au-delà de laquelle la mémoire de SC « fuit »
@@ -19,7 +19,7 @@ const LEAK_RATE = 100 // Mo/s : pente 15 s au-delà de laquelle la mémoire de S
 const LEAK_DURATION = 45 // s
 const CALM_AFTER = 60 // s de calme (pente 30 s < seuil / 3) pour clore un épisode
 const STARTUP = 180 // s : pas de détection pendant le chargement initial du jeu
-const SAMPLE_MS = 1000
+const SAMPLE_MS = 2000 // comme l'outil PowerShell : assez pour la pente 15 s et la variation sur 5 s
 const SC_EXE = 'starcitizen.exe'
 
 // ---- Appels natifs ------------------------------------------------------------------
@@ -37,33 +37,62 @@ const FILETIME = koffi.struct('FILETIME', { lo: 'uint32', hi: 'uint32' })
 const getSystemTimes = kernel32.func('bool __stdcall GetSystemTimes(_Out_ FILETIME *idle, _Out_ FILETIME *kernel, _Out_ FILETIME *user)')
 const ntQuery = ntdll.func('int __stdcall NtQuerySystemInformation(int cls, _Out_ uint8_t *buf, uint32 len, _Out_ uint32 *ret)')
 
-// GPU NVIDIA : facultatif (autre marque ou pas de pilote → pas de valeurs GPU)
-interface Nvml {
-  util(): { gpu: number } | null
-  temp(): number | null
-  mem(): { used: number; total: number } | null
+// GPU via les compteurs de performance Windows (PDH), toutes marques de carte.
+// Choisi plutôt que nvml.dll (pilote NVIDIA) : ~11 Mo au lieu de ~20 Mo, 0,5 ms par mesure.
+// Pas de température par cette voie.
+//   \GPU Engine(*)\Utilization Percentage : charge par moteur et par processus → somme des moteurs « 3D »
+//   \GPU Adapter Memory(*)\Dedicated Usage : VRAM utilisée (octets) par carte
+interface Gpu {
+  sample(): { util: number; vramBytes: number } | null
 }
-function loadNvml(): Nvml | null {
+function loadGpu(): Gpu | null {
   try {
-    const lib = koffi.load('nvml.dll')
-    const UTIL = koffi.struct('nvmlUtilization_t', { gpu: 'uint32', memory: 'uint32' })
-    const MEM = koffi.struct('nvmlMemory_t', { total: 'uint64', free: 'uint64', used: 'uint64' })
-    void UTIL
-    void MEM
-    const init = lib.func('int nvmlInit_v2()')
-    const getHandle = lib.func('int nvmlDeviceGetHandleByIndex_v2(uint32 i, _Out_ void **h)')
-    const getUtil = lib.func('int nvmlDeviceGetUtilizationRates(void *h, _Out_ nvmlUtilization_t *u)')
-    const getTemp = lib.func('int nvmlDeviceGetTemperature(void *h, int sensor, _Out_ uint32 *t)')
-    const getMem = lib.func('int nvmlDeviceGetMemoryInfo(void *h, _Out_ nvmlMemory_t *m)')
-    const h: unknown[] = [null]
-    if (init() !== 0 || getHandle(0, h) !== 0) return null
-    const dev = h[0]
+    const pdh = koffi.load('pdh.dll')
+    const open = pdh.func('uint32 __stdcall PdhOpenQueryW(void *src, uintptr_t user, _Out_ void **q)')
+    const add = pdh.func('uint32 __stdcall PdhAddEnglishCounterW(void *q, str16 path, uintptr_t user, _Out_ void **c)')
+    const collect = pdh.func('uint32 __stdcall PdhCollectQueryData(void *q)')
+    const getArray = pdh.func('uint32 __stdcall PdhGetFormattedCounterArrayW(void *c, uint32 fmt, _Inout_ uint32 *size, _Out_ uint32 *count, void *items)')
+    const q: unknown[] = [null]
+    const engine: unknown[] = [null]
+    const vram: unknown[] = [null]
+    if (open(null, 0, q) !== 0) return null
+    if (add(q[0], '\\GPU Engine(*)\\Utilization Percentage', 0, engine) !== 0) return null
+    add(q[0], '\\GPU Adapter Memory(*)\\Dedicated Usage', 0, vram) // facultatif
+    collect(q[0]) // la charge se calcule entre deux collectes : la première sert de référence
+
+    let buf = Buffer.alloc(64 * 1024) // réutilisé d'une mesure à l'autre
+    const PDH_FMT_DOUBLE = 0x200
+    const ITEM = 24 // PDH_FMT_COUNTERVALUE_ITEM_W : pointeur du nom (8) + statut (4) + remplissage (4) + double (8)
+
+    // Parcourt les instances d'un compteur : appelle fn(nom, valeur)
+    function each(counter: unknown, fn: (name: string, value: number) => void): boolean {
+      const size = [buf.length]
+      const count = [0]
+      let st = getArray(counter, PDH_FMT_DOUBLE, size, count, buf)
+      if (st === 0x800007d2 /* PDH_MORE_DATA */) {
+        buf = Buffer.alloc(size[0] + 4096)
+        size[0] = buf.length
+        st = getArray(counter, PDH_FMT_DOUBLE, size, count, buf)
+      }
+      if (st !== 0) return false
+      const base = BigInt(koffi.address(buf))
+      for (let i = 0; i < count[0]; i++) {
+        const at = Number(buf.readBigUInt64LE(i * ITEM) - base)
+        let end = at
+        while (end + 1 < buf.length && (buf[end] || buf[end + 1])) end += 2
+        fn(buf.toString('utf16le', at, end), buf.readDoubleLE(i * ITEM + 16))
+      }
+      return true
+    }
+
     return {
-      util: () => { const u = { gpu: 0 }; return getUtil(dev, u) === 0 ? u : null },
-      temp: () => { const t = [0]; return getTemp(dev, 0, t) === 0 ? t[0] : null },
-      mem: () => {
-        const m = { used: 0, total: 0 }
-        return getMem(dev, m) === 0 ? { used: Number(m.used), total: Number(m.total) } : null
+      sample() {
+        if (collect(q[0]) !== 0) return null
+        let util = 0
+        if (!each(engine[0], (name, v) => { if (name.endsWith('engtype_3D')) util += v })) return null
+        let vramBytes = 0
+        if (vram[0]) each(vram[0], (_, v) => { vramBytes = Math.max(vramBytes, v) })
+        return { util: Math.min(100, util), vramBytes }
       },
     }
   } catch {
@@ -127,7 +156,7 @@ function slope(buf: Pt[], win: number): number | null {
 export type LeakState = 'startup' | 'stable' | 'rising' | 'leak' | 'recovering'
 
 export function createSystemMonitor() {
-  const nvml = loadNvml()
+  const gpu = loadGpu()
   let timer: NodeJS.Timeout | null = null
   let out: Flat = {}
 
@@ -166,13 +195,10 @@ export function createSystemMonitor() {
     }
     const cpu = cpuPct()
     if (cpu !== null) f['sys.cpu_pct'] = cpu
-    if (nvml) {
-      const u = nvml.util()
-      const t = nvml.temp()
-      const m = nvml.mem()
-      if (u) f['sys.gpu_pct'] = u.gpu
-      if (t !== null) f['sys.gpu_temp'] = t
-      if (m) { f['sys.vram_used_gb'] = m.used / 2 ** 30; f['sys.vram_total_gb'] = m.total / 2 ** 30 }
+    const g = gpu?.sample()
+    if (g) {
+      f['sys.gpu_pct'] = g.util
+      if (g.vramBytes) f['sys.vram_used_gb'] = g.vramBytes / 2 ** 30
     }
 
     // ---- Star Citizen + détection de fuite (logique de l'outil PowerShell) ----
@@ -201,7 +227,9 @@ export function createSystemMonitor() {
       }
 
       const state: LeakState = leak ? (leak.calmSince !== null ? 'recovering' : 'leak') : startup ? 'startup' : hotSince !== null ? 'rising' : 'stable'
-      const fiveAgo = [...hist].reverse().find((h) => now - h.t >= 5)
+      // relevé d'il y a au moins 5 s (parcours depuis la fin, sans copier le tableau)
+      let fiveAgo: Pt | undefined
+      for (let i = hist.length - 1; i >= 0; i--) if (now - hist[i].t >= 5) { fiveAgo = hist[i]; break }
       f['sc.private_mb'] = mb
       f['sc.delta5_mb'] = fiveAgo ? mb - fiveAgo.mb : 0
       if (s15 !== null) f['sc.slope15'] = s15
@@ -209,11 +237,11 @@ export function createSystemMonitor() {
       f['sc.leak'] = state
       if (leak) f['sc.leak_growth_mb'] = mb - leak.onsetMb
     }
-    out = f
+    out = flatten(f) // arrondi une fois par mesure (et non à chaque envoi)
   }
 
   return {
-    gpu: nvml !== null,
+    gpu: gpu !== null,
     start() {
       if (timer) return
       sample()

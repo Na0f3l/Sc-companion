@@ -37,7 +37,7 @@ const gb = (v: number) => v.toFixed(1)
       <div><span class="k">RAM available</span><span class="v">{{ gb(num('sys.ram_avail_gb')) }} / {{ gb(num('sys.ram_total_gb')) }} GB</span></div>
       <div v-if="running"><span class="k">SC growth 15 s / 30 s</span><span class="v">{{ Math.round(num('sc.slope15')) }} / {{ Math.round(num('sc.slope30')) }} MB/s</span></div>
       <div v-if="leak === 'leak' || leak === 'recovering'"><span class="k">Leak growth</span><span class="v">{{ fmtDelta(num('sc.leak_growth_mb')) }}</span></div>
-      <div v-if="has('sys.vram_used_gb')"><span class="k">VRAM</span><span class="v">{{ gb(num('sys.vram_used_gb')) }} / {{ gb(num('sys.vram_total_gb')) }} GB</span></div>
+      <div v-if="has('sys.vram_used_gb')"><span class="k">VRAM</span><span class="v">{{ gb(num('sys.vram_used_gb')) }} GB used</span></div>
       <div><span class="k">Thresholds</span><span class="v">warn {{ WARN }}% · crit {{ CRIT }}% · leak 100 MB/s for 45 s</span></div>
     </div>
 

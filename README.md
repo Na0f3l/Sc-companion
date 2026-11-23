@@ -18,12 +18,15 @@ Prérequis : Node 24, et la télémétrie activée côté jeu (LIVE 4.10 : varia
 Le schéma `.proto` vient du projet communautaire [Sokren/sc-telemetry-deck](https://github.com/Sokren/sc-telemetry-deck) (`schema/sc_extrait.proto`). Il n'a pas de licence, donc il n'est pas inclus : le récupérer et le placer dans `telemetrie/proto/sc_telemetry.proto`.
 
 ```
-cd service    && npm install && node src/index.ts                 # jeu en direct (127.0.0.1:2942)
-cd service    && node src/index.ts --replay ../telemetrie/captures # ou : rejeu de captures
-cd interface  && npm install && npm run dev                       # http://localhost:5173 (et http://<ip-du-pc>:5173 sur le téléphone)
+cd interface && npm install && npm run build   # une fois (et après chaque modification de l'interface)
+cd service   && npm install && node src/index.ts  # puis ouvrir http://localhost:2950 (ou http://<ip-du-pc>:2950 sur le téléphone)
 ```
 
-Lancer le service avec `node` directement plutôt que `npm run` (npm garde un processus parent qui coûte ~60 Mo).
+Le service sert lui-même l'interface compilée : pas besoin du serveur de développement Vite pour jouer (~500 Mo économisés). `npm run dev` dans `interface/` ne sert qu'à développer.
+
+Options du service : `--replay ../telemetrie/captures` (rejeu de captures), `--game-dir <dossier>` (jeu hors de `…\StarCitizen\LIVE`), `--port <n>`. Le lancer avec `node` directement plutôt que `npm run` (npm garde un processus parent de ~60 Mo).
+
+Empreinte mesurée : ~59 Mo de mémoire privée, ~1 % d'un cœur CPU, ~0,3 Ko/s par écran.
 
 Suivi mémoire : double-clic sur `memoire/app/Lancer.vbs`.
 

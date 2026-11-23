@@ -3,7 +3,8 @@
 //   npm run replay                       rejoue telemetrie/captures
 //   node src/index.ts --replay <fichier|dossier> [--port 2950]
 //
-// HTTP  GET /health  → état du service et sa mémoire (pour surveiller l'empreinte)
+// HTTP  GET /        → interface compilée (interface/dist), à ouvrir sur PC ou téléphone
+//       GET /health  → état du service et sa mémoire (pour surveiller l'empreinte)
 // WS    /ws          → { type: 'snapshot', data } à la connexion, puis { type: 'patch', set, del } à 5 Hz max
 import http from 'node:http'
 import { WebSocketServer, type WebSocket } from 'ws'
@@ -13,6 +14,7 @@ import { createLiveSource } from './sources/live.ts'
 import type { Source } from './sources/source.ts'
 import { createSystemMonitor } from './system.ts'
 import { createGameLogReader } from './gamelog.ts'
+import { hasInterface, serveStatic } from './static.ts'
 
 const args = process.argv.slice(2)
 const opt = (name: string): string | undefined => {
@@ -31,14 +33,19 @@ const gameLog = createGameLogReader(opt('game-dir')) // mode de jeu (PU / Arena 
 
 // ---- Diffusion ------------------------------------------------------------------
 let state: Flat = {} // dernier état envoyé aux écrans
+let lastFrame: unknown = null // dernière trame du jeu traitée…
+let frameFlat: Flat = {} // …et sa version à plat
 let timer: NodeJS.Timeout | null = null
 const clients = new Set<WebSocket>()
 
 function tick(): void {
   // Télémétrie du jeu (absente si le jeu ne tourne pas) + mesures système, dans le même état à plat.
-  // flatten() arrondit aussi les mesures système à 2 décimales.
   const frame = source.latest()
-  const next = { ...(frame ? flatten(frame) : {}), ...flatten(system.flat()), ...gameLog.flat() }
+  if (frame !== lastFrame) { // même trame qu'au tick précédent : pas besoin de la remettre à plat
+    lastFrame = frame
+    frameFlat = frame ? flatten(frame) : {}
+  }
+  const next = { ...frameFlat, ...system.flat(), ...gameLog.flat() }
   const patch = diff(state, next)
   state = next
   if (!patch) return
@@ -80,6 +87,7 @@ const server = http.createServer((req, res) => {
     }))
     return
   }
+  if (serveStatic(req, res)) return // interface compilée
   res.writeHead(404).end()
 })
 
@@ -95,4 +103,7 @@ wss.on('connection', (ws) => {
   })
 })
 
-server.listen(PORT, () => console.log(`SC Companion service : http://localhost:${PORT}  (ws /ws, health /health)`))
+server.listen(PORT, () => {
+  console.log(`SC Companion service : http://localhost:${PORT}  (ws /ws, health /health)`)
+  if (!hasInterface()) console.log('Interface not built yet: run "npm run build" in interface/')
+})
