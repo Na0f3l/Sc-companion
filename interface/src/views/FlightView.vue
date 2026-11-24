@@ -319,6 +319,20 @@ const role = computed(() => {
   min-width: 0;
 }
 
+// Entre téléphone et 3 colonnes : Flight | Propulsion, puis Annunciators | Pilot côte à côte
+// sur toute la largeur (sinon la colonne empilée reste seule avec un trou à côté).
+@media (min-width: 621px) and (max-width: 899.98px) {
+  .flight {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .side {
+    grid-column: 1 / -1;
+    grid-template-rows: none;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
 // Écran pilote le plus court possible : contenu tassé en haut (pas réparti sur la hauteur de la rangée),
 // écarts minimaux. :deep(.body) = le contenu de MfdPanel.
 .crew :deep(.body) {

@@ -58,7 +58,7 @@ const loco = computed(() => LOCO[str(`${ACT}state.locomotion`).replace('ACTOR_LO
 </script>
 
 <template>
-  <section class="screens">
+  <section class="screens foot">
     <MfdPanel class="wide" title="Health" source="actor.vitals" tab="HEALTH">
       <VitalRings />
       <div class="tiles">
@@ -120,6 +120,12 @@ const loco = computed(() => LOCO[str(`${ACT}state.locomotion`).replace('ACTOR_LO
 </template>
 
 <style scoped lang="scss">
+// Placement « dense » : sur 2 colonnes, Wallet remonte dans le trou à côté d'Injuries
+// (Health et Environment prennent toute la largeur). Sur 3 colonnes, rien ne change.
+.foot {
+  grid-auto-flow: dense;
+}
+
 .tiles {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(68px, 1fr));

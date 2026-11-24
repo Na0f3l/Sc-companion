@@ -7,6 +7,7 @@ import { computed } from 'vue'
 export type IdleKind = 'link' | 'offline' | 'menu' | 'loading'
 
 const props = defineProps<{ kind: IdleKind }>()
+defineEmits<{ demo: [] }>()
 
 const TEXT: Record<IdleKind, { code: string; title: string; sub: string; hint: string }> = {
   link: {
@@ -69,6 +70,8 @@ const ticks = Array.from({ length: 36 }, (_, i) => {
       <h2>{{ t.title }}</h2>
       <p class="sub">{{ t.sub }}</p>
       <p class="hint">{{ t.hint }}</p>
+      <!-- voir les écrans sans le jeu : visiteurs, ou développement sans lancer SC -->
+      <button type="button" class="demo" @click="$emit('demo')">Preview mode<span>See the screens with sample data</span></button>
     </div>
   </section>
 </template>
@@ -180,5 +183,38 @@ h2 {
   border-top: 1px solid var(--line);
   font-size: 10px;
   line-height: 1.6;
+}
+
+.demo {
+  @include bevel(8px);
+  justify-self: start;
+  display: grid;
+  gap: 2px;
+  margin-top: 10px;
+  padding: 8px 16px;
+  border: 1px solid var(--cyan-dim);
+  background: var(--panel);
+  color: var(--cyan);
+  font: 600 12px var(--font-num);
+  letter-spacing: 0.16em;
+  text-align: left;
+  text-transform: uppercase;
+  cursor: pointer;
+
+  span {
+    color: var(--muted);
+    font: 400 10px var(--font-ui);
+    letter-spacing: 0.06em;
+    text-transform: none;
+  }
+
+  &:hover {
+    border-color: var(--cyan);
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--amber);
+    outline-offset: 2px;
+  }
 }
 </style>

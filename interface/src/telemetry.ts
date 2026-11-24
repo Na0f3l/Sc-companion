@@ -4,6 +4,7 @@
 // Vue observe chaque clé séparément : quand la vitesse change, seuls les éléments
 // qui affichent la vitesse sont redessinés.
 import { reactive, ref } from 'vue'
+import { demoData, type DemoView } from './demo'
 
 export type Value = string | number | boolean
 type Msg =
@@ -45,20 +46,25 @@ export const NO_VALUE = 1e30
 
 // ---- WebSocket avec reconnexion automatique ----------------------------------------
 let delay = 500
+let ws: WebSocket | null = null
+let retry: ReturnType<typeof setTimeout> | undefined
 
 function clear(): void {
   for (const k of Object.keys(tm)) delete tm[k]
 }
 
 export function connect(): void {
-  const ws = new WebSocket(`${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}/ws`)
+  if (demo.value) return
+  const sock = new WebSocket(`${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}/ws`)
   link.value = 'connecting'
 
-  ws.onopen = () => {
+  ws = sock
+  sock.onopen = () => {
     link.value = 'online'
     delay = 500
   }
-  ws.onmessage = (e) => {
+  sock.onmessage = (e) => {
+    if (ws !== sock) return
     const msg = JSON.parse(e.data as string) as Msg
     if (msg.type === 'snapshot') {
       clear()
@@ -69,10 +75,39 @@ export function connect(): void {
       for (const k of msg.del) delete tm[k]
     }
   }
-  ws.onclose = () => {
+  sock.onclose = () => {
+    if (ws !== sock) return // ancienne connexion, fermée volontairement (mode démo)
+    ws = null
     link.value = 'offline'
     clear()
-    setTimeout(connect, delay)
+    retry = setTimeout(connect, delay)
     delay = Math.min(delay * 2, 5000) // 0,5 s, 1 s, 2 s… plafonné à 5 s
   }
+}
+
+// ---- Mode démo ----------------------------------------------------------------------
+// Voir les écrans sans le jeu (ni le service) : la connexion est coupée et l'état est figé
+// sur des valeurs d'exemple (demo.ts). Pas de simulation, juste les panneaux.
+export const demo = ref(false)
+export const demoView = ref<DemoView>('ship')
+
+export function showDemo(view: DemoView): void {
+  if (!demo.value) {
+    demo.value = true
+    clearTimeout(retry)
+    ws?.close()
+    ws = null
+    link.value = 'online'
+    source.value = 'demo'
+  }
+  demoView.value = view
+  clear()
+  Object.assign(tm, demoData(view))
+}
+
+export function exitDemo(): void {
+  demo.value = false
+  clear()
+  source.value = ''
+  connect()
 }
