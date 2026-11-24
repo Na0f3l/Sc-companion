@@ -4,6 +4,7 @@
 import { computed, ref } from 'vue'
 import { has, num, str } from '@/telemetry'
 import Sparkline from './Sparkline.vue'
+import { canFullscreen, fullscreen, toggleFullscreen } from '@/wakelock'
 
 const open = ref(false)
 
@@ -53,6 +54,20 @@ const gb = (v: number) => v.toFixed(1)
       <div class="side">
         <span class="state">{{ running ? LEAK_LABEL[leak] ?? '' : 'GAME OFF' }}</span>
         <button type="button" class="arrow" :aria-expanded="open" aria-label="Details" @click="open = !open">{{ open ? '▾' : '▴' }}</button>
+        <!-- plein écran, comme sur un lecteur vidéo : 4 coins vers l'extérieur (vers l'intérieur pour sortir) -->
+        <button
+          v-if="canFullscreen"
+          type="button"
+          class="arrow fs"
+          :title="fullscreen ? 'Exit full screen' : 'Full screen'"
+          :aria-label="fullscreen ? 'Exit full screen' : 'Full screen'"
+          @click="toggleFullscreen"
+        >
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path v-if="!fullscreen" d="M4 9V4h5M15 4h5v5M20 15v5h-5M9 20H4v-5" />
+            <path v-else d="M9 4v5H4M20 9h-5V4M15 20v-5h5M4 15h5v5" />
+          </svg>
+        </button>
       </div>
 
       <div class="small">
@@ -104,7 +119,8 @@ const gb = (v: number) => v.toFixed(1)
 
 .lbl {
   @include label;
-  font-size: 9px;
+  font-size: 11px; // à 9 px le R de « RAM » se lisait comme un H
+  font-weight: 600;
 }
 
 .big {
@@ -156,6 +172,22 @@ const gb = (v: number) => v.toFixed(1)
   font-size: 11px;
   font-weight: 600;
   letter-spacing: 0.1em;
+}
+
+// bouton plein écran : même cadre que la flèche du détail, picto dessiné
+.fs {
+  display: grid;
+  place-items: center;
+  padding: 0;
+
+  svg {
+    width: 14px;
+    height: 14px;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 2;
+    stroke-linecap: square;
+  }
 }
 
 .arrow {

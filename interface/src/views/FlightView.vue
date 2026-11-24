@@ -78,7 +78,9 @@ type Flag = { label: string; title: string; danger?: boolean }
 // ESP coupé : ne devrait jamais l'être, mais le jeu le coupe parfois tout seul → bande rouge en bas du panneau.
 // Signalé seulement vaisseau alimenté et en mode combat (SCM) : en NAV l'ESP est coupé par le quantum et ne sert à rien.
 // Pas de condition sur « enabled » : ESP coupé en jeu, le jeu passe enabled ET active à faux (vérifié en direct).
-const espLost = () => mode.value?.label !== 'NAV' && bool(VEH + 'power.powerplants') && !ifcsOn('ifcs_esp')
+// Moteurs coupés (jauge H-Fuel à 0, constaté en jeu) : le jeu coupe aussi l'ESP → rien à signaler.
+const enginesOn = () => num(FLI + 'hydrogen_fuel') > 0
+const espLost = () => mode.value?.label !== 'NAV' && bool(VEH + 'power.powerplants') && enginesOn() && !ifcsOn('ifcs_esp')
 // Compensateur de gravité : censé être toujours actif → rien quand il l'est, bande rouge quand il est coupé
 // (vaisseau alimenté, tous modes : il compte aussi en NAV près d'une planète).
 const gravLost = () => bool(VEH + 'power.powerplants') && !ifcsOn('ifcs_gravity_compensation')

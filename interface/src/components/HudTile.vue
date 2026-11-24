@@ -30,6 +30,8 @@ withDefaults(defineProps<{ value: string; label: string; tone?: 'ok' | 'good' | 
   background: rgb(99 228 221 / 3%);
   color: var(--text);
   @include bevel(6px);
+  @include bevel-edges(6px);
+  position: relative;
 }
 
 .visual {

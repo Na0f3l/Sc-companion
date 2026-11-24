@@ -10,7 +10,7 @@ import { shownAlert } from '@/alerts'
     <div v-if="shownAlert" :key="shownAlert.id" class="overlay" :class="`is-${shownAlert.level}`" role="alert">
       <div class="band" />
       <div class="box">
-        <p class="title">ALERT!</p>
+        <p class="title">{{ shownAlert.level === 'info' ? 'CLEAR' : 'ALERT!' }}</p>
         <p class="msg">{{ shownAlert.message }}</p>
       </div>
       <div class="band" />
@@ -32,6 +32,11 @@ import { shownAlert } from '@/alerts'
   box-shadow: inset 0 0 0 3px var(--a);
   pointer-events: none;
 
+  &.is-info {
+    --a: var(--green);
+    --glow: 94 232 122;
+  }
+
   &.is-warning {
     --a: var(--amber);
     --glow: 242 194 59;
@@ -45,13 +50,14 @@ import { shownAlert } from '@/alerts'
     inset: 0;
     z-index: -1;
     background: radial-gradient(ellipse at center, rgb(var(--glow) / 25%) 0%, rgb(var(--glow) / 70%) 100%);
-    // 3 battements = 1,5 s = DISPLAY_MS ; « forwards » : reste sur le dernier état (atténué)
+    // 3 battements = 1,5 s = DISPLAY_MS.critical ; « forwards » : reste sur le dernier état (atténué)
     // au lieu de revenir à pleine intensité juste avant la sortie
     animation: pulse 0.5s ease-out 3 forwards;
   }
 
-  // Alerte orange : moins intrusive, voile fixe sans battement (seul le rouge clignote)
-  &.is-warning::before {
+  // Alertes orange et verte : moins intrusives, voile fixe sans battement (seul le rouge clignote)
+  &.is-warning::before,
+  &.is-info::before {
     animation: none;
     opacity: 0.35;
   }

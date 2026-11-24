@@ -15,6 +15,7 @@
   --muted: #5f9c9e;
   --amber: #f2c23b;
   --red: #ff5b4f;
+  --green: #5ee87a;
 
   --font-num: 'Oxanium', 'Bahnschrift', 'Segoe UI', sans-serif;
   --font-ui: 'Chakra Petch', 'Bahnschrift', 'Segoe UI', sans-serif;
@@ -46,6 +47,12 @@
   --panel: #1a0807;
   --panel-2: #250c0a;
   --bg: #120403;
+}
+
+:root[data-alert='info'] {
+  --cyan: #5ee87a;
+  --cyan-dim: #227a3a;
+  --line: #17482a;
 }
 
 :root[data-alert='warning'] {

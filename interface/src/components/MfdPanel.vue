@@ -71,29 +71,15 @@ code {
 
 footer {
   @include numeric;
-  display: flex;
-  justify-content: space-between;
   margin: 0 -14px;
-  padding: 7px 14px;
+  // pas de flèches ◀ ▶ comme dans le jeu : ici elles ne changeraient pas d'écran
+  padding: 7px 14px 7px calc(14px + 0.2em); // compense l'espace ajouté après la dernière lettre
   border-top: 1px solid var(--line);
   background: rgb(99 228 221 / 5%);
   color: var(--cyan);
   font-size: 13px;
   font-weight: 600;
   letter-spacing: 0.2em;
-
-  &::before,
-  &::after {
-    color: var(--cyan-dim);
-    font-size: 11px;
-  }
-
-  &::before {
-    content: '◀';
-  }
-
-  &::after {
-    content: '▶';
-  }
+  text-align: center;
 }
 </style>

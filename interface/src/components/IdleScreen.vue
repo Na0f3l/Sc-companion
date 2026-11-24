@@ -190,6 +190,8 @@ h2 {
 
 .demo {
   @include bevel(8px);
+  @include bevel-edges(8px);
+  position: relative;
   justify-self: start;
   display: grid;
   gap: 2px;
@@ -211,8 +213,10 @@ h2 {
     text-transform: none;
   }
 
+  // survol en jaune, comme les autres boutons d'action (onglets, lien SPViewer)
   &:hover {
-    border-color: var(--cyan);
+    border-color: var(--amber);
+    color: var(--amber);
   }
 
   &:focus-visible {

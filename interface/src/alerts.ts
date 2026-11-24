@@ -12,16 +12,18 @@
 import { computed, shallowRef, watch } from 'vue'
 import { ACT, FLI, VEH, annunciator, annunciatorFlashing, bool, has, num, str } from './telemetry'
 import { playAlert } from './sound'
-import { type AlertGroup, alertEnabled, componentAlertEnabled, settings } from './settings'
+import { type AlertGroup, alertEnabled, alertSoundEnabled, componentAlertEnabled, settings } from './settings'
 import { flash } from './hit'
 import { crash, gearDown, skim } from './crash'
 
-export type AlertLevel = 'critical' | 'warning'
+export type AlertLevel = 'critical' | 'warning' | 'info'
 
 export interface AlertItem {
   id: string
   level: AlertLevel
   message: string
+  /** groupe du menu : décide si l'alerte sonne (sans groupe, les tests, elle sonne toujours) */
+  group?: AlertGroup
 }
 
 export interface AlertRule extends AlertItem {
@@ -31,11 +33,14 @@ export interface AlertRule extends AlertItem {
   repeatMs?: number
 }
 
-export const DISPLAY_MS = 1500 // durée d'affichage d'une alerte (3 battements de 0,5 s, voir AlertOverlay)
+// durée d'affichage d'une alerte : 1,5 s (3 battements de 0,5 s pour le rouge, voir AlertOverlay) ;
+// les vertes (bonne nouvelle) sont brèves
+export const DISPLAY_MS: Record<AlertLevel, number> = { critical: 1500, warning: 1500, info: 900 }
 
 // Alertes de test : déclenchées depuis le menu « Test » de l'en-tête, affichées une fois.
 // Mêmes messages et niveaux que les vraies alertes, pour juger du rendu et du son.
 export const TESTS = {
+  info: { label: 'Info alert', item: { id: 'test-info', level: 'info', message: 'Radar unlocked' } },
   medium: { label: 'Medium alert', item: { id: 'test-medium', level: 'warning', message: 'Obstacle nearby' } },
   high: { label: 'High alert', item: { id: 'test-high', level: 'critical', message: 'Crash imminent' } },
   ram: { label: 'RAM alert', item: { id: 'test-ram', level: 'critical', message: 'RAM leak detected' } },
@@ -91,6 +96,7 @@ const proxQuiet = () => bool(`${VEH}flight.state.is_landed`) || crash.value !== 
 // Niveaux :
 //  - critical : alerte importante, rouge, avec son
 //  - warning  : alerte secondaire, orange, son discret
+//  - info     : bonne nouvelle, verte, brève, sans clignotement (ponctuelles, via pushAlert)
 // L'ordre fixe la priorité quand plusieurs alertes arrivent ensemble.
 const RULES: AlertRule[] = [
   // Crash au sol : distance d'arrêt du vaisseau contre hauteur au-dessus du sol (voir crash.ts)
@@ -107,9 +113,10 @@ const RULES: AlertRule[] = [
   { id: 'ram-leak', group: 'ramLeak', level: 'critical', message: 'RAM leak detected', active: () => str('sc.leak') === 'leak' },
   { id: 'mem-crit', group: 'memory', level: 'critical', message: 'Memory critical', active: above('sys.commit_pct', 75, 72) },
   { id: 'mem-high', group: 'memory', level: 'warning', message: 'Memory high', active: above('sys.commit_pct', 65, 62) },
-  // Menaces, relevées en test réel (2026-11-24) : RADR orange fixe = verrouillé au radar ;
-  // MISL rouge fixe = missile verrouillé ; MISL rouge clignotant = missile lancé.
-  // RADR orange peut aussi vouloir dire radar endommagé : impossible à distinguer, traité comme un verrouillage.
+  // Menaces, relevées en test réel (2026-11-24) : RADR orange ou rouge = verrouillé au radar (le rouge,
+  // verrouillage plus menaçant, n'est PAS un radar endommagé) ; MISL rouge fixe = missile verrouillé ;
+  // MISL rouge clignotant = missile lancé. Le RADR n'est donc jamais traité comme un dégât de composant.
+  { id: 'radar-lock-hard', group: 'radarLock', level: 'critical', message: 'Radar lock', active: () => annunciator('radr') === 'major' },
   { id: 'radar-lock', group: 'radarLock', level: 'warning', message: 'Radar lock', active: () => annunciator('radr') === 'minor' },
   { id: 'missile-lock', group: 'missile', level: 'warning', message: 'Missile lock', active: () => annunciator('misl') === 'major' && !annunciatorFlashing('misl') },
   { id: 'missile-launch', group: 'missile', level: 'critical', message: 'Missile incoming', active: () => annunciator('misl') === 'major' && annunciatorFlashing('misl') },
@@ -138,8 +145,9 @@ function showNext(): void {
   shownAlert.value = queue.shift() ?? null
   if (shownAlert.value) {
     lastShown.set(shownAlert.value.id, performance.now())
-    playAlert(shownAlert.value.level)
-    setTimeout(showNext, DISPLAY_MS)
+    const g = shownAlert.value.group
+    if (!g || alertSoundEnabled(g)) playAlert(shownAlert.value.level)
+    setTimeout(showNext, DISPLAY_MS[shownAlert.value.level])
   }
 }
 
@@ -180,6 +188,17 @@ watch(
   { immediate: true },
 )
 
+// ---- Fin de verrouillage radar ---------------------------------------------------------
+// RADR orange / rouge → normal : plus personne ne nous verrouille → alerte verte « Radar unlocked ».
+// Seulement vers « normal » : un voyant qui s'éteint (vaisseau coupé, jeu fermé) n'est pas un délock.
+watch(
+  () => annunciator('radr'),
+  (now, before) => {
+    if (now === 'nominal' && (before === 'minor' || before === 'major') && alertEnabled('radarLock'))
+      pushAlert({ id: 'radar-unlocked', group: 'radarLock', level: 'info', message: 'Radar unlocked' })
+  },
+)
+
 // ---- Température du corps : alertes par paliers ------------------------------------
 //
 // Chaud : 39 °C franchi en montant → orange ; puis 40, 41, 42… → rouge à chaque degré entier franchi.
@@ -206,14 +225,14 @@ watch(
     if (hot >= HOT_WARN && hot > hotDone) {
       hotDone = hot
       const crit = hot >= HOT_CRIT
-      if (alertEnabled('bodyTemp')) pushAlert({ id: `body-hot-${hot}`, level: crit ? 'critical' : 'warning', message: `${crit ? 'Hyperthermia' : 'Body temp high'} · ${hot}°C` })
+      if (alertEnabled('bodyTemp')) pushAlert({ id: `body-hot-${hot}`, group: 'bodyTemp', level: crit ? 'critical' : 'warning', message: `${crit ? 'Hyperthermia' : 'Body temp high'} · ${hot}°C` })
     }
 
     const cold = Math.floor(t) + 1 // plus bas entier strictement passé en dessous
     if (cold <= COLD_WARN && cold < coldDone) {
       coldDone = cold
       const crit = cold <= COLD_CRIT
-      if (alertEnabled('bodyTemp')) pushAlert({ id: `body-cold-${cold}`, level: crit ? 'critical' : 'warning', message: `${crit ? 'Hypothermia' : 'Body temp low'} · ${cold}°C` })
+      if (alertEnabled('bodyTemp')) pushAlert({ id: `body-cold-${cold}`, group: 'bodyTemp', level: crit ? 'critical' : 'warning', message: `${crit ? 'Hypothermia' : 'Body temp low'} · ${cold}°C` })
     }
   },
 )
@@ -230,7 +249,6 @@ const COMPONENTS = [
   { ann: 'thr', power: 'engines', name: 'Thrusters' },
   { ann: 'wpn', power: 'weapons', name: 'Weapons' },
   { ann: 'cool', power: 'coolers', name: 'Coolers' },
-  { ann: 'radr', power: 'sensors', name: 'Radar' },
   { ann: 'shld', power: 'shield_generators', name: 'Shields' },
 ] as const
 const SEVERITY = { off: 0, nominal: 0, minor: 1, major: 2 } as const
@@ -247,11 +265,9 @@ for (const c of COMPONENTS) {
     () => SEVERITY[annunciator(c.ann)],
     (now, before) => {
       if (now <= before || !poweredSince || performance.now() - poweredSince < POWER_SETTLE_MS) return
-      // radar à l'orange = verrouillage radar (alerte « Radar lock ») : seul le rouge compte comme dégât
-      if (c.ann === 'radr' && now < 2) return
       if (!componentAlertEnabled(c.ann)) return
       const major = now === 2
-      pushAlert({ id: `comp-${c.ann}-${now}`, level: major ? 'critical' : 'warning', message: `${c.name} ${major ? 'critical' : 'damaged'}` })
+      pushAlert({ id: `comp-${c.ann}-${now}`, group: 'components', level: major ? 'critical' : 'warning', message: `${c.name} ${major ? 'critical' : 'damaged'}` })
       if (alertEnabled('hit')) flash()
     },
   )

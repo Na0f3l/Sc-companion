@@ -15,6 +15,7 @@ import MemoryBar from './components/MemoryBar.vue'
 import Marquee from './components/Marquee.vue'
 import ShipInfo from './components/ShipInfo.vue'
 import DataUpdate from './components/DataUpdate.vue'
+import MobileConnect from './components/MobileConnect.vue'
 import { shipName } from './ships'
 
 // ?demo dans l'adresse : ouvre directement le mode démo (lien à partager, page hébergée sans service)
@@ -61,6 +62,8 @@ const shipClass = computed(() => str(`${VEH}class_name`))
 const ship = computed(() => shipName(shipClass.value))
 // cadre du contexte dans l'en-tête : cliqué aux commandes, il ouvre la fiche du vaisseau (ShipInfo)
 const ctxEl = ref<HTMLElement>()
+// raccourci Mobile connect dans l'en-tête (aussi dans le menu) ; seulement sur le PC (localhost)
+const mobile = ref<InstanceType<typeof MobileConnect>>()
 
 const TABS = [
   { view: 'foot', ctx: 'pied', label: 'Player' },
@@ -111,7 +114,15 @@ const TABS = [
             <path v-else d="M16 9l6 6M22 9l-6 6" />
           </svg>
         </button>
+        <!-- Mobile connect : QR code pour ouvrir l'appli sur le téléphone (aussi dans le menu) -->
+        <button v-if="mobile?.onPc" type="button" class="test icon" title="Mobile connect" aria-label="Mobile connect" @click="mobile?.open()">
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <rect x="7" y="3" width="10" height="18" rx="1.5" />
+            <path d="M11 18h2" />
+          </svg>
+        </button>
         <AppMenu />
+        <MobileConnect ref="mobile" />
       </div>
     </header>
 
@@ -162,7 +173,7 @@ const TABS = [
 .top {
   display: flex;
   align-items: center;
-  gap: 12px 20px;
+  gap: 12px 5px;
 
   > * {
     flex: none;
@@ -177,7 +188,7 @@ const TABS = [
 .right {
   display: flex;
   align-items: center;
-  gap: 12px 20px;
+  gap: 5px;
   margin-left: auto;
 }
 
@@ -187,6 +198,7 @@ const TABS = [
   font-size: 15px;
   font-weight: 700;
   letter-spacing: 0.18em;
+  margin-right: 15px; // le titre garde un peu plus d'air que les boutons
 
   // une ligne et vraiment peu de place : le titre cède sa place au nom du vaisseau
   @media (min-width: 761px) and (max-width: 900px) {
@@ -194,14 +206,15 @@ const TABS = [
   }
 }
 
+// Contexte (vaisseau / à pied) : même gabarit que PU, Menu et le bouton son (petit, angles droits)
 .ctx {
   display: inline-flex;
   align-items: center;
-  gap: 10px;
-  padding: 6px 14px;
+  gap: 8px;
+  padding: 4px 10px;
   border: 1px solid var(--cyan-dim);
   background: var(--panel);
-  font-size: 13px;
+  font: 500 11px var(--font-ui);
   letter-spacing: 0.1em;
   text-transform: uppercase;
   white-space: nowrap;
@@ -211,7 +224,6 @@ const TABS = [
   @media (max-width: 960px) {
     --marquee-max: 110px;
   }
-  @include bevel(8px);
 
   // seul élément de l'en-tête qui rétrécit (le nom du vaisseau défile, voir Marquee)
   .top > & {
@@ -251,8 +263,8 @@ const TABS = [
 }
 
 .dot {
-  width: 8px;
-  height: 8px;
+  width: 6px;
+  height: 6px;
   background: var(--cyan);
 
   &.off {
@@ -346,6 +358,8 @@ const TABS = [
 
 .tab {
   @include bevel(8px);
+  @include bevel-edges(8px);
+  position: relative;
   min-width: 120px;
   padding: 7px 18px;
   border: 1px solid var(--line);
@@ -357,9 +371,10 @@ const TABS = [
   cursor: pointer;
   transition: color 0.2s, border-color 0.2s, background-color 0.2s;
 
+  // survol en jaune (aussi sur l'onglet actif)
   &:hover:not(:disabled) {
-    border-color: var(--cyan-dim);
-    color: var(--text);
+    border-color: var(--amber);
+    color: var(--amber);
   }
 
   &.on {
@@ -401,31 +416,36 @@ const TABS = [
 // Lien SPViewer : fixé au-dessus de la bande mémoire (50 px), sous elle quand son détail est déplié (z-index 50)
 .spv {
   position: fixed;
-  right: max(16px, env(safe-area-inset-right));
+  right: env(safe-area-inset-right, 0px); // collé au bord de l'écran : se détache du contenu
   // collé à la bande mémoire (50 px + sa bordure du haut) : un onglet posé dessus, sans bordure basse
   bottom: calc(51px + env(safe-area-inset-bottom, 0px));
   z-index: 40;
-  padding: 4px 9px 3px;
+  padding: 4px 9px 3px 12px;
   border: 1px solid var(--line);
   border-bottom: 0;
+  border-right: 0;
+  clip-path: polygon(8px 0, 100% 0, 100% 100%, 0 100%, 0 8px); // coin haut gauche coupé, comme les onglets
+  @include bevel-edges(8px, $br: false);
   background: var(--panel);
   color: var(--muted);
   font: 500 10px var(--font-ui);
-  letter-spacing: 0.1em;
+  letter-spacing: 0.06em;
   text-decoration: none;
-  text-transform: uppercase;
 
   b {
     color: var(--text);
     font-weight: 600;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
   }
 
+  // survol en jaune, comme les onglets
   &:hover {
-    border-color: var(--cyan-dim);
-    color: var(--cyan);
+    border-color: var(--amber);
+    color: var(--amber);
 
     b {
-      color: var(--cyan);
+      color: var(--amber);
     }
   }
 

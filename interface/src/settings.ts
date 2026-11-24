@@ -4,7 +4,7 @@ import { reactive, watch } from 'vue'
 
 /** Groupes d'alertes activables / désactivables dans le menu. */
 export const ALERT_GROUPS = [
-  { key: 'hit', label: 'Hit flash' },
+  { key: 'hit', label: 'Hit flash', silent: true }, // flash seul, sans son
   { key: 'crash', label: 'Crash / ground proximity' },
   { key: 'collision', label: 'Collision / proximity' },
   { key: 'components', label: 'Component damaged' },
@@ -25,13 +25,13 @@ export const COMPONENT_ALERTS = [
   { key: 'thr', label: 'Thrusters' },
   { key: 'wpn', label: 'Weapons' },
   { key: 'cool', label: 'Coolers' },
-  { key: 'radr', label: 'Radar' },
   { key: 'shld', label: 'Shields' },
 ] as const
 export type ComponentKey = (typeof COMPONENT_ALERTS)[number]['key']
 
 interface Settings {
   alerts: Record<AlertGroup, boolean>
+  sound: Record<AlertGroup, boolean> // son de chaque alerte, indépendant de son affichage
   components: Record<ComponentKey, boolean>
   keepAwake: boolean // garder l'écran allumé (wakelock.ts)
   acePilot: boolean // alertes de vol bien plus tolérantes à la prise de risque (crash.ts, alerts.ts)
@@ -39,6 +39,7 @@ interface Settings {
 
 const DEFAULTS: Settings = {
   alerts: Object.fromEntries(ALERT_GROUPS.map((g) => [g.key, true])) as Record<AlertGroup, boolean>,
+  sound: Object.fromEntries(ALERT_GROUPS.map((g) => [g.key, true])) as Record<AlertGroup, boolean>,
   components: Object.fromEntries(COMPONENT_ALERTS.map((c) => [c.key, true])) as Record<ComponentKey, boolean>,
   // activé d'office sur écran tactile (téléphone, tablette) ; sur PC l'écran sert déjà au jeu
   keepAwake: window.matchMedia('(pointer: coarse)').matches,
@@ -55,6 +56,7 @@ function load(): Settings {
       ...DEFAULTS,
       ...saved,
       alerts: { ...DEFAULTS.alerts, ...saved.alerts },
+      sound: { ...DEFAULTS.sound, ...saved.sound },
       components: { ...DEFAULTS.components, ...saved.components },
     }
   } catch {
@@ -77,4 +79,5 @@ watch(
 )
 
 export const alertEnabled = (g: AlertGroup): boolean => settings.alerts[g]
+export const alertSoundEnabled = (g: AlertGroup): boolean => settings.sound[g]
 export const componentAlertEnabled = (c: ComponentKey): boolean => settings.alerts.components && settings.components[c]

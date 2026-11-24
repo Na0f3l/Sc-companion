@@ -2,7 +2,7 @@
 //
 // Sources surveillées (une seule suffit) :
 //  - personnage : la santé baisse d'au moins 0,5 point ;
-//  - vaisseau   : le voyant HIT passe au minor / major, ou monte d'un niveau (minor → major) ;
+//  - vaisseau   : le voyant HIT s'allume, s'aggrave, ou change d'état allumé (fixe ↔ clignotant) ;
 //                 c'est le voyant du jeu qui s'allume quand le vaisseau est attaqué, boucliers compris ;
 //  - vaisseau   : le niveau de bouclier ou la santé de coque baisse (prévus par le schéma mais
 //                 jamais envoyés en LIVE 4.10 : prêt si le jeu se met à les envoyer).
@@ -10,7 +10,7 @@
 // Le flash pose un attribut data-hit sur <html> ; les couleurs sont dans styles/base.scss.
 // Sous un feu nourri, au plus un flash toutes les 0,3 s pour qu'il reste visible.
 import { watch } from 'vue'
-import { ACT, VEH, annunciator, has, num } from './telemetry'
+import { ACT, VEH, has, num, str } from './telemetry'
 import { alertEnabled } from './settings'
 
 const FLASH_MS = 200
@@ -81,10 +81,29 @@ onDrop(`${ACT}vitals.health.current`, 0.5)
 onDrop(`${VEH}shields.level`, 0.5)
 onDrop(`${VEH}health`, 0.5)
 
-const RANK = { off: 0, nominal: 0, minor: 1, major: 2 } as const
+// Voyant HIT : un flash à chaque nouveau changement « allumé », pas seulement quand il s'aggrave.
+// Sous des tirs répétés, le voyant peut rester au même niveau en passant de fixe à clignotant
+// (ou l'inverse) : chacun de ces changements compte comme un nouveau coup. Seule une baisse
+// de niveau (le voyant qui se calme) ne déclenche rien.
+//
+// Relevé en test réel (capture du 2026-11-24, tirs d'un autre joueur) : à chaque coup, HIT passe de
+// NOMINAL à MAJOR_FLASHING, puis revient seul à NOMINAL ~1,3 s après le dernier coup. Les coups reçus
+// pendant qu'il est allumé ne changent rien dans les données (il reste MAJOR_FLASHING, 3 s pour une rafale).
+// D'où la relance : tant que HIT reste allumé, un flash toutes les 1,5 s (un coup isolé = 1 flash,
+// une rafale qui le tient 3 s = 3 flashs). La minuterie ne tourne que pendant que le voyant est allumé.
+const rank = (s = '') => (s.includes('MAJOR') ? 2 : s.includes('MINOR') ? 1 : 0)
+const HIT_REPEAT_MS = 1500
+let hitTimer: ReturnType<typeof setInterval> | undefined
 watch(
-  () => RANK[annunciator('hit')],
+  () => str(`${VEH}annunciators.hit`),
   (now, before) => {
-    if (now > before) onHit()
+    const r = rank(now)
+    const rb = rank(before)
+    if (r > rb || (r > 0 && r === rb && now !== before)) onHit()
+    if (r > 0 && !hitTimer) hitTimer = setInterval(onHit, HIT_REPEAT_MS)
+    else if (r === 0 && hitTimer) {
+      clearInterval(hitTimer)
+      hitTimer = undefined
+    }
   },
 )

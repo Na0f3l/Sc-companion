@@ -93,7 +93,6 @@ function onComponent(): void {
         </button>
         <button v-if="mobile?.onPc" type="button" class="row" @click="openMobile">
           <span>Mobile connect</span>
-          <span aria-hidden="true">▣</span>
         </button>
       </section>
 
@@ -107,10 +106,11 @@ function onComponent(): void {
           <div class="all">
             <button type="button" class="link" @click="toggleAll">{{ allOn() ? 'None' : 'All' }}</button>
           </div>
+          <!-- Une ligne par groupe : case = l'alerte (affichage), haut-parleur à droite = son son, indépendant -->
           <template v-for="g in ALERT_GROUPS" :key="g.key">
-            <!-- Component damaged : case principale + flèche qui déplie un réglage par composant -->
-            <template v-if="g.key === 'components'">
-              <div class="with-sub">
+            <div class="with-sub">
+              <!-- Component damaged : case principale (tous les composants) + flèche qui déplie un réglage par composant -->
+              <template v-if="g.key === 'components'">
                 <label class="check">
                   <input
                     type="checkbox"
@@ -124,20 +124,39 @@ function onComponent(): void {
                 <button type="button" class="arrow" :aria-expanded="compOpen" aria-label="Show components" @click="compOpen = !compOpen">
                   <span class="caret" :class="{ side: !compOpen }">▾</span>
                 </button>
-              </div>
-              <div v-if="compOpen" class="subchecks">
-                <label v-for="c in COMPONENT_ALERTS" :key="c.key" class="check">
-                  <input v-model="settings.components[c.key]" type="checkbox" @change="onComponent" />
-                  <span class="box" aria-hidden="true" />
-                  {{ c.label }}
-                </label>
-              </div>
-            </template>
-            <label v-else class="check">
-              <input v-model="settings.alerts[g.key]" type="checkbox" />
-              <span class="box" aria-hidden="true" />
-              {{ g.label }}
-            </label>
+              </template>
+              <label v-else class="check">
+                <input v-model="settings.alerts[g.key]" type="checkbox" />
+                <span class="box" aria-hidden="true" />
+                {{ g.label }}
+              </label>
+              <!-- le flash de tir n'a pas de son : place vide pour garder les haut-parleurs alignés -->
+              <span v-if="'silent' in g" class="snd" aria-hidden="true" />
+              <button
+                v-else
+                type="button"
+                class="snd"
+                :class="{ muted: !settings.sound[g.key] }"
+                :disabled="!settings.alerts[g.key]"
+                :aria-pressed="settings.sound[g.key]"
+                :title="settings.sound[g.key] ? 'Sound on' : 'Sound off'"
+                :aria-label="`${g.label} sound`"
+                @click="settings.sound[g.key] = !settings.sound[g.key]"
+              >
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                  <path class="spk" d="M4 9h4l5-4v14l-5-4H4z" />
+                  <path v-if="settings.sound[g.key]" d="M16 9.5a3.5 3.5 0 0 1 0 5M18.5 7a7 7 0 0 1 0 10" />
+                  <path v-else d="M16 9l6 6M22 9l-6 6" />
+                </svg>
+              </button>
+            </div>
+            <div v-if="g.key === 'components' && compOpen" class="subchecks">
+              <label v-for="c in COMPONENT_ALERTS" :key="c.key" class="check">
+                <input v-model="settings.components[c.key]" type="checkbox" @change="onComponent" />
+                <span class="box" aria-hidden="true" />
+                {{ c.label }}
+              </label>
+            </div>
           </template>
         </div>
       </section>
@@ -216,7 +235,7 @@ button:focus-visible,
   overflow-y: auto;
   padding: 8px;
   border: 1px solid var(--cyan-dim);
-  background: var(--panel);
+  @include bevel-edges-bg(8px, var(--cyan-dim), var(--panel)); // le menu défile : diagonales en dégradés
   @include bevel(8px);
 
   section + section {
@@ -308,6 +327,47 @@ button:focus-visible,
   }
 }
 
+// Haut-parleur : son de l'alerte (barré = muet). Grisé quand l'alerte elle-même est désactivée.
+.snd {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 26px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--cyan);
+  cursor: pointer;
+
+  &:hover:not(:disabled) {
+    background: rgb(99 228 221 / 6%);
+  }
+
+  &.muted {
+    color: var(--muted);
+  }
+
+  &:disabled {
+    opacity: 0.35;
+    cursor: default;
+  }
+
+  svg {
+    width: 15px;
+    height: 15px;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 1.6;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+  }
+
+  .spk {
+    fill: currentColor;
+  }
+}
+
 .arrow {
   padding: 6px 8px;
   border: 0;
@@ -388,6 +448,10 @@ button:focus-visible,
 
 .warning .sw {
   background: var(--amber);
+}
+
+.info .sw {
+  background: var(--green);
 }
 
 .critical .sw,

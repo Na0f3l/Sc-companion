@@ -124,7 +124,9 @@ select:focus-visible {
   max-height: calc(100vh - 32px);
   padding: 14px 16px 16px;
   border: 1px solid var(--cyan-dim);
-  background: var(--panel);
+  // coins refermés dans le fond : la fenêtre peut défiler, un pseudo-élément qui déborde ferait
+  // apparaître les barres de défilement (le faux « relief » en bas et à droite)
+  @include bevel-edges-bg(10px, var(--cyan-dim), var(--panel));
   color: var(--text);
   @include bevel(10px);
 

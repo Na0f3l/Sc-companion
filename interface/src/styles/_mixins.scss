@@ -6,6 +6,55 @@
   clip-path: polygon(#{$cut} 0, 100% 0, 100% calc(100% - #{$cut}), calc(100% - #{$cut}) 100%, 0 100%, 0 #{$cut});
 }
 
+// Referme le contour sur les coins coupés : clip-path coupe aussi la bordure CSS, on trace donc
+// chaque diagonale avec un pseudo-élément de 1 px qui HÉRITE la couleur de bordure (survol, état
+// actif… suivent tout seuls). Le trait est posé juste à l'intérieur de la coupe pour ne pas être rogné.
+// L'élément doit être positionné (relative, absolute, fixed) et ne pas défiler (sinon : bevel-edges-bg).
+// $br: false → seulement le coin haut gauche.
+@mixin bevel-edges($cut: 12px, $br: true) {
+  &::before,
+  &::after {
+    content: '';
+    position: absolute;
+    width: $cut * 1.4142;
+    height: 0;
+    border: 0 solid;
+    border-color: inherit;
+    border-top-width: 1px;
+    pointer-events: none;
+  }
+
+  // -1px : un enfant absolu se place dans la bordure, pas sur son bord extérieur
+  &::before {
+    top: -1px;
+    left: -1px;
+    transform-origin: 0 0;
+    transform: translateY($cut) rotate(-45deg);
+  }
+
+  @if $br {
+    &::after {
+      right: -1px;
+      bottom: -1px;
+      transform-origin: 100% 100%;
+      transform: translateY(-$cut) rotate(-45deg);
+    }
+  } @else {
+    &::after {
+      display: none;
+    }
+  }
+}
+
+// Même chose en dégradés de fond, pour un élément qui défile (les pseudo-éléments défileraient avec
+// son contenu). Couleur fixe : $color ; $bg = le fond de l'élément.
+@mixin bevel-edges-bg($cut, $color, $bg) {
+  background:
+    linear-gradient(135deg, #{$color} 0 calc(#{$cut} * 0.7071 + 1px), transparent 0),
+    linear-gradient(-45deg, #{$color} 0 calc(#{$cut} * 0.7071 + 1px), transparent 0),
+    #{$bg};
+}
+
 // Petit libellé en capitales espacées.
 @mixin label {
   font-family: var(--font-ui);

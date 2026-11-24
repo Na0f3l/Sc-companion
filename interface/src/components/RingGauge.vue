@@ -67,6 +67,8 @@ const level = computed(() => {
   border: 1px solid var(--line);
   background: rgb(99 228 221 / 3%);
   @include bevel(6px);
+  @include bevel-edges(6px);
+  position: relative;
 
   &.is-warn {
     --c: var(--amber);

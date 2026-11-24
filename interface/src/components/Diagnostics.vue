@@ -3,7 +3,7 @@
 //
 // Ce que le jeu envoie (LIVE 4.10) :
 //  - l'alimentation par CATÉGORIE (vehicle.state.power.*), en tout ou rien ;
-//  - le voyant d'alerte associé (PWR, THR, WPN, COOL, SHLD, RADR) : normal / mineur / majeur ;
+//  - le voyant d'alerte associé (PWR, THR, WPN, COOL, SHLD ; RADR signale un verrouillage, pas un dégât) : normal / mineur / majeur ;
 //  - les armes une par une (nom technique, alimentée, prête à tirer).
 // Ce qu'il n'envoie pas : les noms des autres composants (Thermax, Explorer…) ni leur usure / santé.
 // Une catégorie éteinte n'est pas envoyée du tout : « éteint » et « absent du vaisseau » se confondent.
@@ -25,7 +25,7 @@ const CATEGORIES: Category[] = [
   { key: 'shield_emitters', label: 'Shield Emitter', icon: 'emitter', ann: 'shld' },
   { key: 'engines', label: 'Thrusters', icon: 'engine', ann: 'thr' },
   { key: 'weapons', label: 'Weapons', icon: 'weapon', ann: 'wpn' },
-  { key: 'sensors', label: 'Radar', icon: 'radar', ann: 'radr' },
+  { key: 'sensors', label: 'Radar', icon: 'radar' }, // RADR = verrouillage ennemi, pas l'état du radar
   { key: 'life_support', label: 'Life Support', icon: 'life' },
   { key: 'gravity_generators', label: 'Gravity Generator', icon: 'gravity' },
   // pas de champ d'alimentation pour le quantum : seulement son voyant (éteint en SCM, normal en NAV)

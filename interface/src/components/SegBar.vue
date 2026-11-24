@@ -78,6 +78,8 @@ i {
   background: var(--off);
   border: 1px solid var(--line);
   @include bevel(4px);
+  @include bevel-edges(4px);
+  position: relative;
 
   &.on {
     background: var(--c);
