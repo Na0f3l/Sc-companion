@@ -1,7 +1,8 @@
 // Vitesse max d'un vaisseau, pour l'échelle de la barre de vitesse (barre pleine = vitesse max).
 //
 // Le jeu n'envoie pas la vitesse max. Par ordre de priorité :
-//  1. KNOWN : table des vitesses réelles par vaisseau (class_name), à remplir quand on aura les données ;
+//  1. vitesse réelle du vaisseau, tirée de ships.json (voir ships.ts) ; en SCM, barre pleine = vitesse
+//     de boost (la plus haute atteignable dans ce mode), à défaut la SCM ;
 //  2. la vitesse max APPRISE : la plus haute vitesse atteinte avec ce vaisseau dans ce mode (SCM / NAV),
 //     mémorisée dans le navigateur ;
 //  3. DEFAULTS tant que le vaisseau n'a jamais volé dans ce mode.
@@ -11,11 +12,15 @@
 //  - après un changement de vaisseau ou de mode, rien n'est appris pendant GRACE_MS (le temps de
 //    ralentir après NAV → SCM, sinon la vitesse NAV serait apprise comme vitesse SCM).
 import { reactive } from 'vue'
+import { shipInfo } from './ships'
 
 export type Mode = 'SCM' | 'NAV'
 
-/** Vitesses réelles par vaisseau, prioritaires sur l'apprentissage. Ex. ANVL_Hornet_F7A_Mk2: { SCM: 220, NAV: 1235 } */
-const KNOWN: Record<string, Partial<Record<Mode, number>>> = {}
+/** Vitesse réelle du vaisseau dans ce mode, prioritaire sur l'apprentissage. */
+function known(ship: string, mode: Mode): number | undefined {
+  const s = shipInfo(ship)
+  return mode === 'NAV' ? s?.nav : (s?.boost ?? s?.scm)
+}
 
 const DEFAULTS: Record<Mode, number> = { SCM: 250, NAV: 1000 }
 const MAX_PLAUSIBLE = 2500 // m/s : aucun vaisseau ne va plus vite hors quantum
@@ -48,8 +53,8 @@ function save(): void {
 
 /** Vitesse correspondant à une barre pleine, et d'où elle vient. */
 export function speedMax(ship: string, mode: Mode): { value: number; source: 'known' | 'learned' | 'default' } {
-  const known = KNOWN[ship]?.[mode]
-  if (known) return { value: known, source: 'known' }
+  const k = known(ship, mode)
+  if (k) return { value: k, source: 'known' }
   const l = learned[ship]?.[mode]
   if (l) return { value: l, source: 'learned' }
   return { value: DEFAULTS[mode], source: 'default' }
@@ -60,7 +65,7 @@ let since = 0
 
 /** À appeler à chaque nouvelle vitesse : retient la plus haute atteinte pour ce vaisseau et ce mode. */
 export function learnSpeed(ship: string, mode: Mode, speed: number): void {
-  if (!ship || KNOWN[ship]?.[mode]) return
+  if (!ship || known(ship, mode)) return
   const now = performance.now()
   const ctx = `${ship}|${mode}`
   if (ctx !== context) {

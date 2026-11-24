@@ -84,7 +84,10 @@ const ticks = Array.from({ length: 36 }, (_, i) => {
   justify-content: center;
   align-items: center;
   gap: 28px 40px;
-  min-height: 55vh;
+  // centré verticalement dans la place entre l'en-tête et la bande mémoire : hauteur de l'écran moins
+  // la marge du haut, l'en-tête, l'espace sous l'en-tête et la marge du bas de la page (~180 px, voir App.vue)
+  min-height: calc(100vh - 180px);
+  min-height: calc(100dvh - 180px);
   padding: 24px 0;
 
   &.is-link {

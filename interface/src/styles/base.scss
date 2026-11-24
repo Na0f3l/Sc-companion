@@ -130,3 +130,27 @@ body {
 // Pas de coupure globale des animations avec prefers-reduced-motion : Windows l'active dès que
 // « Effets d'animation » est désactivé, ce qui supprimait les alertes et le lissage des instruments.
 // Ici le mouvement porte de l'information ; il reste léger (opacity / transform uniquement).
+
+// Barres de défilement minimalistes, partout (page, menu, fiche du vaisseau, fenêtres) : un trait de 1 px
+// à la couleur du thème (bleu en PU, rouge en AC, et la couleur de l'alerte en cours), sans fond ni flèches.
+::-webkit-scrollbar {
+  width: 1px;
+  height: 1px;
+}
+
+::-webkit-scrollbar-track,
+::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--cyan);
+}
+
+// navigateurs sans ::-webkit-scrollbar (Firefox) : la version fine standard, même couleur
+@supports not selector(::-webkit-scrollbar) {
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: var(--cyan) transparent;
+  }
+}

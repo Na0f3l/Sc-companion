@@ -5,8 +5,11 @@
 //
 // HTTP  GET /        → interface compilée (interface/dist), à ouvrir sur PC ou téléphone
 //       GET /health  → état du service et sa mémoire (pour surveiller l'empreinte)
+//       GET /lan     → adresses du PC sur le réseau local (QR code « Mobile connect » de l'interface)
+//       /data/…      → données des vaisseaux et leur mise à jour (shipdata.ts)
 // WS    /ws          → { type: 'snapshot', data } à la connexion, puis { type: 'patch', set, del } à 5 Hz max
 import http from 'node:http'
+import os from 'node:os'
 import { WebSocketServer, type WebSocket } from 'ws'
 import { diff, flatten, type Flat } from './flat.ts'
 import { createReplaySource } from './sources/replay.ts'
@@ -15,6 +18,7 @@ import type { Source } from './sources/source.ts'
 import { createSystemMonitor } from './system.ts'
 import { createGameLogReader } from './gamelog.ts'
 import { hasInterface, serveStatic } from './static.ts'
+import { checkLatest, serveData } from './shipdata.ts'
 
 const args = process.argv.slice(2)
 const opt = (name: string): string | undefined => {
@@ -77,6 +81,19 @@ function onLastClientGone(): void {
 }
 
 // ---- Serveurs -------------------------------------------------------------------
+// Adresses IPv4 du PC joignables depuis le téléphone : réseau privé d'abord (192.168 puis 10 puis 172.16-31,
+// ce dernier étant souvent un adaptateur virtuel Hyper-V / WSL), sans boucle locale ni 169.254 (pas de DHCP).
+function lanUrls(): string[] {
+  const rank = (ip: string): number =>
+    ip.startsWith('192.168.') ? 0 : ip.startsWith('10.') ? 1 : /^172.(1[6-9]|2d|3[01])./.test(ip) ? 2 : 3
+  return Object.values(os.networkInterfaces())
+    .flat()
+    .filter((a) => a && a.family === 'IPv4' && !a.internal && !a.address.startsWith('169.254.'))
+    .map((a) => a!.address)
+    .sort((a, b) => rank(a) - rank(b))
+    .map((ip) => `http://${ip}:${PORT}`)
+}
+
 const server = http.createServer((req, res) => {
   if (req.url === '/health') {
     const mem = process.memoryUsage()
@@ -91,6 +108,12 @@ const server = http.createServer((req, res) => {
     }))
     return
   }
+  if (req.url === '/lan') {
+    res.writeHead(200, { 'content-type': 'application/json', 'cache-control': 'no-store' })
+    res.end(JSON.stringify({ port: PORT, urls: lanUrls() }))
+    return
+  }
+  if (serveData(req, res)) return // données vaisseaux (avant l'interface : la copie à jour est prioritaire)
   if (serveStatic(req, res)) return // interface compilée
   res.writeHead(404).end()
 })
@@ -108,6 +131,7 @@ wss.on('connection', (ws) => {
 })
 
 server.listen(PORT, () => {
+  void checkLatest() // nouvelle version du jeu sur le wiki ? (un appel, en arrière-plan)
   console.log(`SC Companion service : http://localhost:${PORT}  (ws /ws, health /health)`)
   if (!hasInterface()) console.log('Interface not built yet: run "npm run build" in interface/')
 })

@@ -1,6 +1,6 @@
 <script setup lang="ts">
 // Page principale : choisit les écrans selon le contexte du personnage (à pied / aux commandes).
-import { computed, onMounted, watchEffect } from 'vue'
+import { computed, onMounted, ref, watch, watchEffect } from 'vue'
 import { ACT, VEH, connect, demo, demoView, exitDemo, has, link, showDemo, source, str } from './telemetry'
 import { alertLevel } from './alerts'
 import { soundOn, soundUnlocked, toggleSound } from './sound'
@@ -13,6 +13,9 @@ import AlertOverlay from './components/AlertOverlay.vue'
 import IdleScreen, { type IdleKind } from './components/IdleScreen.vue'
 import MemoryBar from './components/MemoryBar.vue'
 import Marquee from './components/Marquee.vue'
+import ShipInfo from './components/ShipInfo.vue'
+import DataUpdate from './components/DataUpdate.vue'
+import { shipName } from './ships'
 
 // ?demo dans l'adresse : ouvre directement le mode démo (lien à partager, page hébergée sans service)
 onMounted(() => (new URLSearchParams(location.search).has('demo') ? showDemo('ship') : connect()))
@@ -31,7 +34,7 @@ watchEffect(() => {
 
 // Contexte affiché, du plus « bloquant » au plus précis :
 //  service injoignable → jeu non lancé → menu → chargement → à pied / en vol
-const ctx = computed<'vol' | 'pied' | IdleKind>(() => {
+const gameCtx = computed<'vol' | 'pied' | IdleKind>(() => {
   if (demo.value) return demoView.value === 'ship' ? 'vol' : 'pied'
   if (link.value !== 'online') return 'link'
   if (!has('sc.private_mb')) return 'offline' // StarCitizen.exe absent (mesuré par le service)
@@ -40,12 +43,27 @@ const ctx = computed<'vol' | 'pied' | IdleKind>(() => {
   const seated = str(`${ACT}state.locomotion`).endsWith('SEATED')
   return seated && has(`${VEH}class_name`) ? 'vol' : 'pied'
 })
+// Aux commandes, l'onglet Player permet d'aller voir l'état du personnage ; on revient à Ship d'un clic,
+// et tout changement de contexte dans le jeu (quitter le siège…) annule ce choix.
+const peek = ref(false)
+watch(gameCtx, (c) => c !== 'vol' && (peek.value = false))
+const ctx = computed(() => (!demo.value && peek.value && gameCtx.value === 'vol' ? 'pied' : gameCtx.value))
+// en démo : les deux onglets ; en direct : seulement aux commandes (à pied, pas de données vaisseau à montrer)
+const tabsLive = computed(() => demo.value || gameCtx.value === 'vol')
+function pickTab(view: 'foot' | 'ship'): void {
+  if (demo.value) showDemo(view)
+  else peek.value = view === 'foot'
+}
+const soundLabel = computed(() => (!soundOn.value ? 'Sound off' : soundUnlocked.value ? 'Sound on' : 'Click to enable sound'))
 const IDLE_LABEL: Record<string, string> = { link: 'No link', offline: 'Game not running', menu: 'Main menu', loading: 'Loading' }
 const idle = computed(() => (ctx.value === 'vol' || ctx.value === 'pied' ? null : ctx.value))
-const ship = computed(() => str(`${VEH}class_name`).replaceAll('_', ' '))
+const shipClass = computed(() => str(`${VEH}class_name`))
+const ship = computed(() => shipName(shipClass.value))
+// cadre du contexte dans l'en-tête : cliqué aux commandes, il ouvre la fiche du vaisseau (ShipInfo)
+const ctxEl = ref<HTMLElement>()
 
 const TABS = [
-  { view: 'foot', ctx: 'pied', label: 'On foot' },
+  { view: 'foot', ctx: 'pied', label: 'Player' },
   { view: 'ship', ctx: 'vol', label: 'Ship' },
 ] as const
 </script>
@@ -54,35 +72,57 @@ const TABS = [
   <main class="page">
     <header class="top">
       <div class="brand">SC COMPANION</div>
-      <div class="ctx" aria-live="polite">
+      <div ref="ctxEl" class="ctx" :class="{ info: gameCtx === 'vol' }" aria-live="polite">
         <span class="dot" :class="{ off: link !== 'online' }" />
-        <template v-if="ctx === 'vol'"><b>In flight</b><span class="sep">·</span><Marquee :text="ship" /></template>
-        <template v-else-if="ctx === 'pied'"><b>On foot</b><span class="sep">·</span><span>Character</span></template>
-        <template v-else>{{ IDLE_LABEL[ctx] }}</template>
+        <!-- contexte réel dans le jeu (pas l'onglet affiché) : le vaisseau, ou « On foot » -->
+        <Marquee v-if="gameCtx === 'vol'" :text="ship" />
+        <!-- petit carré fléché : la fiche du vaisseau s'ouvre d'un clic (ShipInfo) -->
+        <svg v-if="gameCtx === 'vol'" class="more" viewBox="0 0 12 12" aria-hidden="true">
+          <rect x="0.5" y="0.5" width="11" height="11" />
+          <path d="M3.5 3.5 L8.5 8.5 M8.5 4.5 V8.5 H4.5" />
+        </svg>
+        <b v-else-if="gameCtx === 'pied'">On foot</b>
+        <template v-else>{{ IDLE_LABEL[gameCtx] }}</template>
       </div>
       <span v-if="gameMode" class="gmode" :class="gameMode">{{ MODE_LABEL[gameMode] }}</span>
       <!-- groupe de droite : reste collé à droite, même quand l'en-tête passe sur deux lignes -->
       <div class="right">
         <div v-if="!demo" class="feed">{{ link }}<template v-if="source"> · {{ source === 'replay' ? 'capture replay' : 'live game' }}</template></div>
         <button v-if="demo" type="button" class="test call" @click="exitDemo">Exit preview</button>
-        <!-- le premier clic sur la page déverrouille l'audio ; ce bouton sert aussi à couper / remettre le son -->
+        <!-- nouvelle version du jeu sur le wiki : mise à jour des données vaisseaux (affiché seulement dans ce cas) -->
+        <DataUpdate />
+        <!-- le premier clic sur la page déverrouille l'audio ; ce bouton sert aussi à couper / remettre le son.
+             Haut-parleur barré = son coupé ; en orange tant que le navigateur n'a pas encore autorisé le son -->
         <button
           type="button"
-          class="test"
+          class="test icon"
           :class="{ call: soundOn && !soundUnlocked }"
+          :title="soundLabel"
+          :aria-label="soundLabel"
+          :aria-pressed="soundOn"
           @click="soundUnlocked && toggleSound()"
         >
-          {{ !soundOn ? 'Sound off' : soundUnlocked ? 'Sound on' : 'Click to enable sound' }}
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path class="spk" d="M4 9h4l5-4v14l-5-4H4z" />
+            <template v-if="soundOn">
+              <path d="M16 9.5a3.5 3.5 0 0 1 0 5" />
+              <path d="M18.5 7a7 7 0 0 1 0 10" />
+            </template>
+            <path v-else d="M16 9l6 6M22 9l-6 6" />
+          </svg>
         </button>
         <AppMenu />
       </div>
     </header>
 
+    <ShipInfo :anchor="gameCtx === 'vol' ? ctxEl : undefined" :ship="shipClass" />
     <AlertOverlay />
     <MemoryBar />
+    <!-- crédit SPViewer (source des données vaisseaux), onglet posé sur la bande mémoire, en bas à droite -->
+    <a class="spv" href="https://www.spviewer.eu" target="_blank" rel="noopener">Ship data by <b>SPViewer</b> <span aria-hidden="true">↗</span></a>
 
-    <!-- Onglets : en direct, ils suivent le jeu (siège pilote / à pied) ; en démo, on choisit -->
-    <nav v-if="!idle" class="tabs" :class="{ auto: !demo }" aria-label="Screens">
+    <!-- Onglets : en direct, ils suivent le jeu ; aux commandes, Player montre l'état du personnage ; en démo, on choisit -->
+    <nav v-if="!idle" class="tabs" aria-label="Screens">
       <button
         v-for="t in TABS"
         :key="t.view"
@@ -90,12 +130,12 @@ const TABS = [
         class="tab"
         :class="{ on: ctx === t.ctx }"
         :aria-current="ctx === t.ctx ? 'page' : undefined"
-        :disabled="!demo"
-        @click="showDemo(t.view)"
+        :disabled="!tabsLive"
+        @click="pickTab(t.view)"
       >
         {{ t.label }}
       </button>
-      <span v-if="!demo" class="tabs-hint">Follows the game</span>
+      <span v-if="!tabsLive" class="tabs-hint">Follows the game</span>
     </nav>
 
     <!-- Transition : l'ancien écran s'efface, le nouveau apparaît (opacity uniquement) -->
@@ -113,8 +153,8 @@ const TABS = [
   gap: 18px;
   max-width: 1180px;
   margin: 0 auto;
-  // en bas : la place de la bande mémoire fixe (50 px) + marge
-  padding: 20px max(16px, env(safe-area-inset-right)) 80px max(16px, env(safe-area-inset-left));
+  // en bas : la place de la bande mémoire fixe (50 px), du lien SPViewer + marge
+  padding: 20px max(16px, env(safe-area-inset-right)) 100px max(16px, env(safe-area-inset-left));
 }
 
 // Une seule ligne : le contexte (nom du vaisseau) rétrécit et défile plutôt que de pousser
@@ -188,6 +228,26 @@ const TABS = [
     color: var(--cyan);
     font-weight: 600;
   }
+
+  // aux commandes : clic = fiche du vaisseau
+  &.info {
+    cursor: pointer;
+
+    &:hover .more {
+      color: var(--cyan);
+    }
+  }
+
+  // carré fléché après le nom du vaisseau
+  .more {
+    width: 12px;
+    height: 12px;
+    color: var(--cyan-dim);
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 1.2;
+    transition: color 0.15s;
+  }
 }
 
 .dot {
@@ -220,6 +280,27 @@ const TABS = [
   // information secondaire : cédée en premier quand la place manque
   @media (max-width: 900px) {
     display: none;
+  }
+}
+
+// bouton picto (son) : même hauteur que les boutons texte
+.test.icon {
+  display: grid;
+  place-items: center;
+  padding: 3px 7px;
+
+  svg {
+    width: 18px;
+    height: 18px;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 1.6;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+  }
+
+  .spk {
+    fill: currentColor;
   }
 }
 
@@ -297,7 +378,7 @@ const TABS = [
   }
 }
 
-.auto .tab:not(.on) {
+.tab:disabled:not(.on) {
   opacity: 0.55;
 }
 
@@ -315,5 +396,42 @@ const TABS = [
 .swap-enter-from,
 .swap-leave-to {
   opacity: 0;
+}
+
+// Lien SPViewer : fixé au-dessus de la bande mémoire (50 px), sous elle quand son détail est déplié (z-index 50)
+.spv {
+  position: fixed;
+  right: max(16px, env(safe-area-inset-right));
+  // collé à la bande mémoire (50 px + sa bordure du haut) : un onglet posé dessus, sans bordure basse
+  bottom: calc(51px + env(safe-area-inset-bottom, 0px));
+  z-index: 40;
+  padding: 4px 9px 3px;
+  border: 1px solid var(--line);
+  border-bottom: 0;
+  background: var(--panel);
+  color: var(--muted);
+  font: 500 10px var(--font-ui);
+  letter-spacing: 0.1em;
+  text-decoration: none;
+  text-transform: uppercase;
+
+  b {
+    color: var(--text);
+    font-weight: 600;
+  }
+
+  &:hover {
+    border-color: var(--cyan-dim);
+    color: var(--cyan);
+
+    b {
+      color: var(--cyan);
+    }
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--amber);
+    outline-offset: 1px;
+  }
 }
 </style>

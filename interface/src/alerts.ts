@@ -10,10 +10,11 @@
 // Pour les situations « par paliers » (température du corps), on émet aussi des alertes ponctuelles
 // avec pushAlert(), voir plus bas.
 import { computed, shallowRef, watch } from 'vue'
-import { ACT, FLI, NO_VALUE, VEH, annunciator, annunciatorFlashing, bool, has, num, str } from './telemetry'
+import { ACT, FLI, VEH, annunciator, annunciatorFlashing, bool, has, num, str } from './telemetry'
 import { playAlert } from './sound'
-import { type AlertGroup, alertEnabled, componentAlertEnabled } from './settings'
+import { type AlertGroup, alertEnabled, componentAlertEnabled, settings } from './settings'
 import { flash } from './hit'
+import { crash, gearDown, skim } from './crash'
 
 export type AlertLevel = 'critical' | 'warning'
 
@@ -26,6 +27,8 @@ export interface AlertItem {
 export interface AlertRule extends AlertItem {
   group: AlertGroup // case du menu qui l'active / la désactive
   active: () => boolean
+  /** Réaffichée toutes les repeatMs tant qu'elle reste vraie (danger qui dure : crash) ; sinon une seule fois */
+  repeatMs?: number
 }
 
 export const DISPLAY_MS = 1500 // durée d'affichage d'une alerte (3 battements de 0,5 s, voir AlertOverlay)
@@ -69,52 +72,6 @@ function above(key: string, on: number, off: number): () => boolean {
 }
 
 // ---- Vol ----
-const gearDown = () => /DEPLOY/.test(str(`${VEH}flight.state.gear`)) // sorti ou en cours de sortie
-
-/**
- * Temps avant impact au sol (s), ou null si non calculable.
- * altitude radar (hauteur sous le vaisseau) ÷ vitesse de descente.
- * La vitesse verticale est négative en descente (vérifié sur capture).
- * L'altitude radar vaut 3,4e38 hors de portée : pas de prédiction possible.
- */
-export function timeToImpact(): number | null {
-  const altKey = `${FLI}radar_altitude`
-  if (!has(altKey)) return null
-  const alt = num(altKey)
-  const vsi = num(`${FLI}vertical_speed_indicator`) // absent = 0
-  if (alt > NO_VALUE || vsi >= 0) return null
-  return alt / -vsi
-}
-
-/**
- * Préavis avant impact selon la vitesse : plus on va vite, plus on prévient tôt.
- *   < 800 m/s : 10 s · de 800 à 1000 m/s : de 10 à 20 s · ≥ 1000 m/s : 20 s
- * Limite : il faut que le radar voie déjà le sol (altitude radar reçue) au moment du préavis.
- */
-export function impactLeadTime(speed: number): number {
-  if (speed >= 1000) return 20
-  if (speed > 800) return 10 + ((speed - 800) / 200) * 10
-  return 10
-}
-
-/**
- * Crash imminent : impact au sol prévu dans moins que le préavis (10 à 20 s selon la vitesse).
- * - descente d'au moins 5 m/s (en dessous, c'est une approche, pas une chute) ;
- * - train sorti = atterrissage voulu : seuil beaucoup plus strict (impact < 3 s à plus de 10 m/s,
- *   c'est-à-dire un posé violent), pour ne pas sonner à chaque atterrissage ;
- * - hystérésis : l'alerte retombe quand l'impact n'est plus prévu avant préavis + 2 s.
- */
-function groundImpact(): () => boolean {
-  let on = false
-  return () => {
-    const tti = timeToImpact()
-    const sink = -num(`${FLI}vertical_speed_indicator`)
-    if (tti === null || bool(`${VEH}flight.state.is_landed`)) return (on = false)
-    const [limit, minSink] = gearDown() ? [3, 10] : [impactLeadTime(num(`${FLI}speed`)), 5]
-    on = on ? tti < limit + 2 && sink > minSink / 2 : tti < limit && sink > minSink
-    return on
-  }
-}
 
 /**
  * Collision : voyant PROX du vaisseau au rouge, sauf en manœuvre de décollage / atterrissage :
@@ -122,27 +79,26 @@ function groundImpact(): () => boolean {
  */
 const proximity = (minSpeed: number) =>
   annunciator('prox') === 'major' && !gearDown() && num(`${FLI}speed`) >= minSpeed
-// L'alerte orange « obstacle » ne s'affiche qu'au-dessus de cette vitesse : un posé sportif
-// mais maîtrisé (en station notamment) reste silencieux.
+// Seuils des alertes PROX (le voyant orange seul s'allume tout le temps près du sol : ignoré) :
+//  - PROX rouge entre 60 et 100 m/s : « Proximity warning » (orange) ; désactivée en Ace pilot ;
+//  - PROX rouge au-dessus de 100 m/s (200 en Ace pilot) : « Collision imminent » (rouge).
+// Un posé sportif mais maîtrisé (en station notamment) reste silencieux. Pendant une alerte crash, le sol
+// est déjà signalé : pas de doublon PROX.
 const OBSTACLE_MIN_SPEED = 60 // m/s
-const proxLit = () => annunciator('prox') !== 'off' && annunciator('prox') !== 'nominal' && !gearDown() && !bool(`${VEH}flight.state.is_landed`)
-
-// Au-dessus de cette vitesse, un crash ou une collision devient une alerte importante (rouge + son)
-const FAST = 100 // m/s
-const fast = () => num(`${FLI}speed`) > FAST
-const ground = groundImpact() // une seule instance : son état (hystérésis) est partagé par les deux niveaux
+const fast = () => num(`${FLI}speed`) > (settings.acePilot ? 200 : 100)
+const proxQuiet = () => bool(`${VEH}flight.state.is_landed`) || crash.value !== null
 
 // Niveaux :
 //  - critical : alerte importante, rouge, avec son
 //  - warning  : alerte secondaire, orange, son discret
 // L'ordre fixe la priorité quand plusieurs alertes arrivent ensemble.
 const RULES: AlertRule[] = [
-  { id: 'ground-fast', group: 'crash', level: 'critical', message: 'Crash imminent', active: () => ground() && fast() },
-  { id: 'collision-fast', group: 'collision', level: 'critical', message: 'Collision imminent', active: () => proximity(OBSTACLE_MIN_SPEED) && fast() },
-  { id: 'ground-slow', group: 'crash', level: 'warning', message: 'Ground proximity', active: () => ground() && !fast() },
-  // Voyant PROX allumé (orange ou rouge), quelle que soit la vitesse, sauf posé ou train sorti (hangars, pads) ;
-  // au-dessus de 100 m/s avec PROX rouge, c'est l'alerte rouge « Collision imminent » qui part à la place.
-  { id: 'proximity', group: 'collision', level: 'warning', message: 'Proximity warning', active: () => proxLit() && !(proximity(OBSTACLE_MIN_SPEED) && fast()) },
+  // Crash au sol : distance d'arrêt du vaisseau contre hauteur au-dessus du sol (voir crash.ts)
+  { id: 'crash', group: 'crash', level: 'critical', message: 'Crash imminent', active: () => crash.value === 'crash', repeatMs: 3000 },
+  { id: 'collision-fast', group: 'collision', level: 'critical', message: 'Collision imminent', active: () => proximity(OBSTACLE_MIN_SPEED) && fast() && !proxQuiet() },
+  { id: 'sink', group: 'crash', level: 'warning', message: 'Descent too fast', active: () => crash.value === 'sink', repeatMs: 6000 },
+  { id: 'skim', group: 'crash', level: 'warning', message: 'Pull up', active: () => skim.value, repeatMs: 3000 },
+  { id: 'proximity', group: 'collision', level: 'warning', message: 'Proximity warning', active: () => !settings.acePilot && proximity(OBSTACLE_MIN_SPEED) && !fast() && !proxQuiet() },
   { id: 'health', group: 'health', level: 'critical', message: 'Critical health', active: lowVital('health') },
   { id: 'thirst', group: 'thirst', level: 'warning', message: 'Dehydrated', active: lowVital('thirst') },
   { id: 'hunger', group: 'hunger', level: 'warning', message: 'Starving', active: lowVital('hunger') },
@@ -173,22 +129,53 @@ export function pushAlert(item: AlertItem): void {
   if (!shownAlert.value) showNext()
 }
 
+const lastShown = new Map<string, number>() // id → instant du dernier affichage (pour repeatMs)
+
 function showNext(): void {
+  // une alerte de règle qui n'est plus vraie quand vient son tour est abandonnée (danger passé pendant l'attente) ;
+  // les alertes ponctuelles (pushAlert) passent toujours
+  while (queue.length && RULES.includes(queue[0] as AlertRule) && !activeAlerts.value.includes(queue[0] as AlertRule)) queue.shift()
   shownAlert.value = queue.shift() ?? null
   if (shownAlert.value) {
+    lastShown.set(shownAlert.value.id, performance.now())
     playAlert(shownAlert.value.level)
     setTimeout(showNext, DISPLAY_MS)
   }
 }
 
-// Détection des fronts montants : une règle présente maintenant et absente juste avant
+// Répétition : une alerte « repeatMs » toujours vraie revient dans la file quand son délai est écoulé
+let repeatTimer: ReturnType<typeof setInterval> | undefined
+function repeatTick(): void {
+  const t = performance.now()
+  for (const rule of activeAlerts.value) {
+    if (!rule.repeatMs || queue.includes(rule) || shownAlert.value === rule) continue
+    if (settings.acePilot && rule.level === 'warning') continue // Ace pilot : les orange ne se répètent pas
+    if (t - (lastShown.get(rule.id) ?? 0) >= rule.repeatMs) queue.push(rule)
+  }
+  if (!shownAlert.value) showNext()
+}
+
+// Détection des fronts montants : une règle présente maintenant et absente juste avant.
+// Délai de grâce : une règle affichée il y a moins de COOLDOWN_MS ne revient pas sur un nouveau front
+// (le voyant PROX, par exemple, clignote entre orange et rouge en rase-mottes).
+const COOLDOWN_MS = 8000
 watch(
   activeAlerts,
   (now, before = []) => {
+    const t = performance.now()
     for (const rule of now) {
-      if (!before.includes(rule) && !queue.includes(rule) && shownAlert.value !== rule) queue.push(rule)
+      if (before.includes(rule) || queue.includes(rule) || shownAlert.value === rule) continue
+      if (t - (lastShown.get(rule.id) ?? -Infinity) < COOLDOWN_MS) continue
+      queue.push(rule)
     }
     if (!shownAlert.value) showNext()
+    // minuterie seulement tant qu'une alerte à répétition est active : rien ne tourne le reste du temps
+    const repeating = now.some((r) => r.repeatMs)
+    if (repeating && !repeatTimer) repeatTimer = setInterval(repeatTick, 500)
+    else if (!repeating && repeatTimer) {
+      clearInterval(repeatTimer)
+      repeatTimer = undefined
+    }
   },
   { immediate: true },
 )

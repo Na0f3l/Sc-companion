@@ -45,6 +45,11 @@ Sons d'alerte (`interface/public/sounds/`) :
 - alerte rouge : « warning » de **Lyubomir Ikonomov** ([Freesound 787777](https://freesound.org/s/787777/)), libre d'utilisation ;
 - alerte orange : « Mechanical gas release alert » ([Mixkit](https://mixkit.co/)).
 
+Données des vaisseaux (`interface/public/data/`, régénérées par `npm run ships` dans `service/` ; quand le wiki annonce une nouvelle version du jeu, le bouton « Update ship data » de l'interface les met à jour sans rebuild) :
+
+- noms, vitesses, rotations, carburant : [API du Star Citizen Wiki](https://api.star-citizen.wiki) ;
+- accélérations en G mesurées en jeu : données communautaires de [SPViewer](https://www.spviewer.eu).
+
 ## Avertissement
 
 Projet personnel, non affilié à Cloud Imperium Games. Le service est en lecture seule : il n'envoie aucune commande au jeu.

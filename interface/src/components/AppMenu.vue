@@ -1,5 +1,5 @@
 <script setup lang="ts">
-// Menu de l'en-tête : réglages (alertes activables une par une) et tests d'alertes.
+// Menu de l'en-tête : Ace pilot et affichage en tête, puis alertes (activables une par une) et tests, dépliables.
 // Les réglages sont mémorisés dans le navigateur (settings.ts). D'autres sections viendront (seuils RAM…).
 // Se ferme avec Échap ou un clic à l'extérieur ; un clic dans le menu (case à cocher) le laisse ouvert.
 import { onBeforeUnmount, ref, watch } from 'vue'
@@ -7,12 +7,20 @@ import { TESTS, type TestKind, shownAlert, triggerTest } from '@/alerts'
 import { flash } from '@/hit'
 import { ALERT_GROUPS, COMPONENT_ALERTS, settings } from '@/settings'
 import { awake, canFullscreen, fullscreen, toggleFullscreen } from '@/wakelock'
+import MobileConnect from './MobileConnect.vue'
 
 // méthode en cours (diagnostic : la vidéo de repli ne marche pas sur tous les téléphones)
 const AWAKE_NOTE = { system: 'Active · system lock', video: 'Active · video fallback', pending: 'Tap anywhere on the page to activate' }
 
 const open = ref(false)
+// fenêtre Mobile connect : hors du panneau (qui se ferme), ouverte par son entrée du menu
+const mobile = ref<InstanceType<typeof MobileConnect>>()
+function openMobile(): void {
+  open.value = false
+  void mobile.value?.open()
+}
 const testsOpen = ref(false)
+const alertsOpen = ref(false)
 const root = ref<HTMLElement | null>(null)
 
 // Écouteurs posés seulement quand le menu est ouvert : rien ne tourne le reste du temps
@@ -64,49 +72,15 @@ function onComponent(): void {
     </button>
 
     <div v-if="open" class="panel">
-      <!-- Alertes : une case par groupe -->
+      <!-- Réglages directs : profil des alertes de vol, puis affichage -->
       <section>
-        <header>
-          <span>Alerts</span>
-          <button type="button" class="link" @click="toggleAll">{{ allOn() ? 'None' : 'All' }}</button>
-        </header>
-        <template v-for="g in ALERT_GROUPS" :key="g.key">
-          <!-- Component damaged : case principale + flèche qui déplie un réglage par composant -->
-          <template v-if="g.key === 'components'">
-            <div class="with-sub">
-              <label class="check">
-                <input
-                  type="checkbox"
-                  :checked="settings.alerts.components"
-                  :indeterminate="compPartial()"
-                  @change="setComponents(($event.target as HTMLInputElement).checked)"
-                />
-                <span class="box" :class="{ partial: compPartial() }" aria-hidden="true" />
-                {{ g.label }}
-              </label>
-              <button type="button" class="arrow" :aria-expanded="compOpen" aria-label="Show components" @click="compOpen = !compOpen">
-                <span class="caret" :class="{ side: !compOpen }">▾</span>
-              </button>
-            </div>
-            <div v-if="compOpen" class="subchecks">
-              <label v-for="c in COMPONENT_ALERTS" :key="c.key" class="check">
-                <input v-model="settings.components[c.key]" type="checkbox" @change="onComponent" />
-                <span class="box" aria-hidden="true" />
-                {{ c.label }}
-              </label>
-            </div>
-          </template>
-          <label v-else class="check">
-            <input v-model="settings.alerts[g.key]" type="checkbox" />
-            <span class="box" aria-hidden="true" />
-            {{ g.label }}
-          </label>
-        </template>
-      </section>
-
-      <!-- Affichage -->
-      <section>
-        <header><span>Display</span></header>
+        <!-- profil des alertes de vol : bien plus tolérant à la prise de risque (crash.ts) -->
+        <label class="check">
+          <input v-model="settings.acePilot" type="checkbox" />
+          <span class="box" aria-hidden="true" />
+          Ace pilot
+        </label>
+        <p class="note">{{ settings.acePilot ? 'Late flight warnings, risk-tolerant' : 'Early flight warnings' }}</p>
         <label class="check">
           <input v-model="settings.keepAwake" type="checkbox" />
           <span class="box" aria-hidden="true" />
@@ -117,6 +91,55 @@ function onComponent(): void {
           <span>{{ fullscreen ? 'Exit full screen' : 'Full screen' }}</span>
           <span aria-hidden="true">⛶</span>
         </button>
+        <button v-if="mobile?.onPc" type="button" class="row" @click="openMobile">
+          <span>Mobile connect</span>
+          <span aria-hidden="true">▣</span>
+        </button>
+      </section>
+
+      <!-- Alertes : sous-liste dépliable, une case par groupe -->
+      <section>
+        <button type="button" class="row" :aria-expanded="alertsOpen" @click="alertsOpen = !alertsOpen">
+          <span>Alerts</span>
+          <span class="caret" :class="{ side: !alertsOpen }">▾</span>
+        </button>
+        <div v-if="alertsOpen" class="subchecks">
+          <div class="all">
+            <button type="button" class="link" @click="toggleAll">{{ allOn() ? 'None' : 'All' }}</button>
+          </div>
+          <template v-for="g in ALERT_GROUPS" :key="g.key">
+            <!-- Component damaged : case principale + flèche qui déplie un réglage par composant -->
+            <template v-if="g.key === 'components'">
+              <div class="with-sub">
+                <label class="check">
+                  <input
+                    type="checkbox"
+                    :checked="settings.alerts.components"
+                    :indeterminate="compPartial()"
+                    @change="setComponents(($event.target as HTMLInputElement).checked)"
+                  />
+                  <span class="box" :class="{ partial: compPartial() }" aria-hidden="true" />
+                  {{ g.label }}
+                </label>
+                <button type="button" class="arrow" :aria-expanded="compOpen" aria-label="Show components" @click="compOpen = !compOpen">
+                  <span class="caret" :class="{ side: !compOpen }">▾</span>
+                </button>
+              </div>
+              <div v-if="compOpen" class="subchecks">
+                <label v-for="c in COMPONENT_ALERTS" :key="c.key" class="check">
+                  <input v-model="settings.components[c.key]" type="checkbox" @change="onComponent" />
+                  <span class="box" aria-hidden="true" />
+                  {{ c.label }}
+                </label>
+              </div>
+            </template>
+            <label v-else class="check">
+              <input v-model="settings.alerts[g.key]" type="checkbox" />
+              <span class="box" aria-hidden="true" />
+              {{ g.label }}
+            </label>
+          </template>
+        </div>
       </section>
 
       <!-- Tests : sous-liste dépliable -->
@@ -133,6 +156,7 @@ function onComponent(): void {
         </div>
       </section>
     </div>
+    <MobileConnect ref="mobile" />
   </div>
 </template>
 
@@ -187,7 +211,8 @@ button:focus-visible,
   display: grid;
   gap: 4px;
   width: 250px;
-  max-height: calc(100vh - 90px);
+  // sous l'en-tête et au-dessus de la bande mémoire (50 px) + le crédit SPViewer
+  max-height: calc(100vh - 160px);
   overflow-y: auto;
   padding: 8px;
   border: 1px solid var(--cyan-dim);
@@ -200,18 +225,7 @@ button:focus-visible,
   }
 }
 
-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: baseline;
-  padding: 2px 6px 6px;
-
-  > span {
-    @include label;
-  }
-}
-
-// « Keep screen on » en attente d'un toucher
+// ligne d'explication sous une case (Ace pilot, Keep screen on)
 .note {
   margin: 0;
   padding: 0 6px 4px 30px;
@@ -307,7 +321,14 @@ header {
 }
 
 .subchecks {
-  padding-left: 18px;
+  padding-left: 12px;
+
+  // « All / None » en tête de la liste des alertes
+  .all {
+    display: flex;
+    justify-content: flex-end;
+    padding: 2px 6px 4px;
+  }
 }
 
 .row,

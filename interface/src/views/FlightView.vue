@@ -10,15 +10,17 @@ import Annunciators from '@/components/Annunciators.vue'
 import Diagnostics from '@/components/Diagnostics.vue'
 import VitalRings from '@/components/VitalRings.vue'
 import GMeter from '@/components/GMeter.vue'
-import { impactLeadTime, timeToImpact } from '@/alerts'
+import { crash, radarHeight, timeToImpact } from '@/crash'
 import { type Mode, learnSpeed, speedMax } from '@/speedmax'
 
 const fr = new Intl.NumberFormat('en-US')
 
 // ---- Instruments ----
-const alt = computed(() => {
-  const a = num(`${FLI}radar_altitude`, NO_VALUE * 2)
-  return a > NO_VALUE ? null : a
+// hauteur radar réelle seulement : au-delà de ~500 m le jeu renvoie l'altitude à la place (voir crash.ts)
+const alt = computed(radarHeight)
+const seaAlt = computed(() => {
+  const a = num(`${FLI}altitude`, NO_VALUE * 2)
+  return has(`${FLI}altitude`) && a < NO_VALUE ? a : null
 })
 const tti = computed(timeToImpact)
 
@@ -165,9 +167,12 @@ const role = computed(() => {
           <span class="num mid">{{ String(Math.round(num(FLI + 'heading')) % 360).padStart(3, '0') }}°</span>
         </div>
         <div class="stack">
-          <span class="lbl">Radar alt.</span>
+          <!-- sol à portée du radar (~500 m) : hauteur réelle ; sinon l'altitude (celle que le HUD du jeu
+               affiche aussi comme altitude radar), qui n'est PAS la hauteur au-dessus du sol -->
+          <span class="lbl">{{ alt !== null ? 'Radar alt.' : 'Altitude' }}</span>
           <span class="num mid">
             <template v-if="alt !== null">{{ fr.format(Math.round(alt)) }}<span class="unit">m</span></template>
+            <template v-else-if="seaAlt !== null">{{ fr.format(Math.round(seaAlt)) }}<span class="unit">m</span></template>
             <template v-else>—</template>
           </span>
         </div>
@@ -178,8 +183,10 @@ const role = computed(() => {
         <!-- temps avant impact au sol, affiché seulement en descente sous 30 s -->
         <div class="stack">
           <span class="lbl">Impact</span>
-          <span class="num mid" :class="{ danger: tti !== null && tti < impactLeadTime(Math.abs(speed)) }">
+          <span class="num mid" :class="{ danger: crash === 'crash' }">
             <template v-if="tti !== null && tti < 30">{{ tti.toFixed(0) }}<span class="unit">s</span></template>
+            <!-- sol hors de portée radar mais descente trop rapide pour s'arrêter à temps (voir crash.ts) -->
+            <span v-else-if="crash === 'sink'" class="sinking">SINK</span>
             <template v-else>—</template>
           </span>
         </div>
@@ -505,5 +512,9 @@ const role = computed(() => {
     font-size: 13px;
     line-height: 1.5;
   }
+}
+
+.sinking {
+  color: var(--amber);
 }
 </style>

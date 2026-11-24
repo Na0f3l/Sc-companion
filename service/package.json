@@ -10,7 +10,8 @@
   "scripts": {
     "live": "node src/index.ts",
     "replay": "node src/index.ts --replay ../telemetrie/captures",
-    "check": "tsc --noEmit"
+    "check": "tsc --noEmit",
+    "ships": "node src/shipdata.ts"
   },
   "dependencies": {
     "@grpc/grpc-js": "^1.14.7",

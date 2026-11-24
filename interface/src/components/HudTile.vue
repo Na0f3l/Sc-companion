@@ -1,6 +1,7 @@
 <script setup lang="ts">
 // Tuile du HUD : un visuel (picto, jauge…) dans le slot, la valeur dessous, un libellé discret.
 // soon : donnée prévue par le jeu mais pas encore envoyée → tuile grisée avec « coming soon » (comme Q-Fuel)
+// slot « spark » (facultatif) : mini-courbe d'historique collée au bas de la tuile
 withDefaults(defineProps<{ value: string; label: string; tone?: 'ok' | 'good' | 'warn' | 'crit'; soon?: boolean }>(), {
   tone: 'ok',
   soon: false,
@@ -13,6 +14,7 @@ withDefaults(defineProps<{ value: string; label: string; tone?: 'ok' | 'good' | 
     <span class="val">{{ value }}</span>
     <span class="name">{{ label }}</span>
     <span v-if="soon" class="soon">coming soon</span>
+    <div v-if="$slots.spark && !soon" class="spark"><slot name="spark" /></div>
   </div>
 </template>
 
@@ -36,6 +38,13 @@ withDefaults(defineProps<{ value: string; label: string; tone?: 'ok' | 'good' | 
   width: 100%;
   max-width: 52px;
   aspect-ratio: 1;
+}
+
+.spark {
+  --spark-h: 20px;
+  width: 100%;
+  margin-top: 2px;
+  padding: 0 4px;
 }
 
 .val {

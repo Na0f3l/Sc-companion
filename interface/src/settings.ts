@@ -34,6 +34,7 @@ interface Settings {
   alerts: Record<AlertGroup, boolean>
   components: Record<ComponentKey, boolean>
   keepAwake: boolean // garder l'écran allumé (wakelock.ts)
+  acePilot: boolean // alertes de vol bien plus tolérantes à la prise de risque (crash.ts, alerts.ts)
 }
 
 const DEFAULTS: Settings = {
@@ -41,6 +42,7 @@ const DEFAULTS: Settings = {
   components: Object.fromEntries(COMPONENT_ALERTS.map((c) => [c.key, true])) as Record<ComponentKey, boolean>,
   // activé d'office sur écran tactile (téléphone, tablette) ; sur PC l'écran sert déjà au jeu
   keepAwake: window.matchMedia('(pointer: coarse)').matches,
+  acePilot: false,
 }
 
 const KEY = 'sc-companion.settings'

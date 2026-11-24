@@ -64,12 +64,15 @@ const loco = computed(() => LOCO[str(`${ACT}state.locomotion`).replace('ACTOR_LO
       <div class="tiles">
         <HudTile :value="`${bodyTemp.toFixed(1)} °C`" label="Body temp" :tone="bodyTone">
           <HudIcon name="body-temp" />
+          <template #spark><Sparkline :value="bodyTemp" :min="33" :max="42" color="var(--amber)" /></template>
         </HudTile>
         <HudTile :value="`${Math.round(heart)} bpm`" label="Heart rate" :tone="heart > 150 ? 'warn' : 'ok'">
           <HudIcon name="heart" />
+          <template #spark><Sparkline :value="heart" :min="40" :max="180" /></template>
         </HudTile>
         <HudTile :value="`${Math.round(o2 * 100)} %`" label="Oxygen" :tone="o2 < 0.3 ? 'crit' : 'ok'">
           <ArcMeter :value="o2" color="#3b82f6"><span class="o2">O<sub>2</sub></span></ArcMeter>
+          <template #spark><Sparkline :value="o2" :min="0" :max="1" color="#3b82f6" /></template>
         </HudTile>
         <HudTile
           :value="intoxSeen ? `${intoxPct} %` : '— %'"
@@ -78,9 +81,9 @@ const loco = computed(() => LOCO[str(`${ACT}state.locomotion`).replace('ACTOR_LO
           :soon="!intoxSeen"
         >
           <ArcMeter :value="intox" color="#f97316"><HudIcon name="pills" /></ArcMeter>
+          <template #spark><Sparkline :value="intox" :min="0" :max="1" color="#f97316" /></template>
         </HudTile>
       </div>
-      <Sparkline :value="heart" :min="40" :max="160" />
     </MfdPanel>
 
     <!-- blessures : lues dans le Game.log par le service (pas dans la télémétrie) -->
