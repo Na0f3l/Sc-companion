@@ -33,11 +33,14 @@ export type ComponentKey = (typeof COMPONENT_ALERTS)[number]['key']
 interface Settings {
   alerts: Record<AlertGroup, boolean>
   components: Record<ComponentKey, boolean>
+  keepAwake: boolean // garder l'écran allumé (wakelock.ts)
 }
 
 const DEFAULTS: Settings = {
   alerts: Object.fromEntries(ALERT_GROUPS.map((g) => [g.key, true])) as Record<AlertGroup, boolean>,
   components: Object.fromEntries(COMPONENT_ALERTS.map((c) => [c.key, true])) as Record<ComponentKey, boolean>,
+  // activé d'office sur écran tactile (téléphone, tablette) ; sur PC l'écran sert déjà au jeu
+  keepAwake: window.matchMedia('(pointer: coarse)').matches,
 }
 
 const KEY = 'sc-companion.settings'

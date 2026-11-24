@@ -5,6 +5,7 @@ import { ACT, VEH, connect, demo, demoView, exitDemo, has, link, showDemo, sourc
 import { alertLevel } from './alerts'
 import { soundOn, soundUnlocked, toggleSound } from './sound'
 import './hit' // flash rouge 0,2 s quand on prend des dégâts
+import './wakelock' // garder l'écran allumé (réglage du menu)
 import AppMenu from './components/AppMenu.vue'
 import FlightView from './views/FlightView.vue'
 import FootView from './views/FootView.vue'

@@ -6,6 +6,10 @@ import { onBeforeUnmount, ref, watch } from 'vue'
 import { TESTS, type TestKind, shownAlert, triggerTest } from '@/alerts'
 import { flash } from '@/hit'
 import { ALERT_GROUPS, COMPONENT_ALERTS, settings } from '@/settings'
+import { awake, canFullscreen, fullscreen, toggleFullscreen } from '@/wakelock'
+
+// méthode en cours (diagnostic : la vidéo de repli ne marche pas sur tous les téléphones)
+const AWAKE_NOTE = { system: 'Active · system lock', video: 'Active · video fallback', pending: 'Tap anywhere on the page to activate' }
 
 const open = ref(false)
 const testsOpen = ref(false)
@@ -100,6 +104,21 @@ function onComponent(): void {
         </template>
       </section>
 
+      <!-- Affichage -->
+      <section>
+        <header><span>Display</span></header>
+        <label class="check">
+          <input v-model="settings.keepAwake" type="checkbox" />
+          <span class="box" aria-hidden="true" />
+          Keep screen on
+        </label>
+        <p v-if="awake !== 'off'" class="note" :class="awake">{{ AWAKE_NOTE[awake] }}</p>
+        <button v-if="canFullscreen" type="button" class="row" @click="toggleFullscreen">
+          <span>{{ fullscreen ? 'Exit full screen' : 'Full screen' }}</span>
+          <span aria-hidden="true">⛶</span>
+        </button>
+      </section>
+
       <!-- Tests : sous-liste dépliable -->
       <section>
         <button type="button" class="row" :aria-expanded="testsOpen" @click="testsOpen = !testsOpen">
@@ -190,6 +209,19 @@ header {
   > span {
     @include label;
   }
+}
+
+// « Keep screen on » en attente d'un toucher
+.note {
+  margin: 0;
+  padding: 0 6px 4px 30px;
+  color: var(--muted);
+
+  &.pending {
+    color: var(--amber);
+  }
+  font: 500 10px var(--font-ui);
+  letter-spacing: 0.04em;
 }
 
 .link {

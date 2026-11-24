@@ -20,6 +20,7 @@ const TYPES: Record<string, string> = {
   '.svg': 'image/svg+xml',
   '.png': 'image/png',
   '.mp3': 'audio/mpeg',
+  '.mp4': 'video/mp4',
   '.json': 'application/json',
 }
 
@@ -40,11 +41,27 @@ export function serveStatic(req: http.IncomingMessage, res: http.ServerResponse)
   }
   if (!stat.isFile()) return false
   const immutable = rel.startsWith('assets/')
-  res.writeHead(200, {
+  const headers = {
     'content-type': TYPES[path.extname(file)] ?? 'application/octet-stream',
-    'content-length': stat.size,
     'cache-control': immutable ? 'public, max-age=31536000, immutable' : 'no-cache',
-  })
+    'accept-ranges': 'bytes',
+  }
+  // Lecture partielle (« Range: bytes=début-fin ») : Safari sur iPhone l'exige pour lire une vidéo
+  const range = /^bytes=(\d*)-(\d*)$/.exec(req.headers.range ?? '')
+  if (range && stat.size > 0) {
+    const start = range[1] ? Number(range[1]) : Math.max(0, stat.size - Number(range[2]))
+    const end = range[1] && range[2] ? Math.min(Number(range[2]), stat.size - 1) : stat.size - 1
+    if (start > end || start >= stat.size) {
+      res.writeHead(416, { 'content-range': `bytes */${stat.size}` })
+      res.end()
+      return true
+    }
+    res.writeHead(206, { ...headers, 'content-length': end - start + 1, 'content-range': `bytes ${start}-${end}/${stat.size}` })
+    if (req.method === 'HEAD') res.end()
+    else fs.createReadStream(file, { start, end }).pipe(res)
+    return true
+  }
+  res.writeHead(200, { ...headers, 'content-length': stat.size })
   if (req.method === 'HEAD') res.end()
   else fs.createReadStream(file).pipe(res)
   return true
