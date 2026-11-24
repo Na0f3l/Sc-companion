@@ -82,4 +82,21 @@ footer {
   letter-spacing: 0.2em;
   text-align: center;
 }
+
+// Téléphone : l'onglet du bas répète le titre, le nom du champ source est une info de développeur
+@include phone {
+  .inner {
+    gap: 8px;
+    padding: 8px 10px 10px;
+  }
+
+  .body {
+    gap: 8px;
+  }
+
+  code,
+  footer {
+    display: none;
+  }
+}
 </style>

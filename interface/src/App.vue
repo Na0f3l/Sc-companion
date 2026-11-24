@@ -6,6 +6,7 @@ import { alertLevel } from './alerts'
 import { soundOn, soundUnlocked, toggleSound } from './sound'
 import './hit' // flash rouge 0,2 s quand on prend des dégâts
 import './wakelock' // garder l'écran allumé (réglage du menu)
+import './viewport' // petits écrans : mise en page PC réduite (zoom) au lieu d'être réorganisée
 import AppMenu from './components/AppMenu.vue'
 import FlightView from './views/FlightView.vue'
 import FootView from './views/FootView.vue'
@@ -91,7 +92,7 @@ const TABS = [
       <!-- groupe de droite : reste collé à droite, même quand l'en-tête passe sur deux lignes -->
       <div class="right">
         <div v-if="!demo" class="feed">{{ link }}<template v-if="source"> · {{ source === 'replay' ? 'capture replay' : 'live game' }}</template></div>
-        <button v-if="demo" type="button" class="test call" @click="exitDemo">Exit preview</button>
+        <button v-if="demo" type="button" class="test call" @click="exitDemo">Exit<span class="long"> preview</span></button>
         <!-- nouvelle version du jeu sur le wiki : mise à jour des données vaisseaux (affiché seulement dans ce cas) -->
         <DataUpdate />
         <!-- le premier clic sur la page déverrouille l'audio ; ce bouton sert aussi à couper / remettre le son.
@@ -179,9 +180,8 @@ const TABS = [
     flex: none;
   }
 
-  @media (max-width: 760px) {
-    flex-wrap: wrap;
-  }
+  // toujours une ligne : la page est réduite (viewport.ts) plutôt que réorganisée ;
+  // seul le nom du vaisseau rétrécit et défile
 }
 
 // boutons et menu toujours collés à droite
@@ -200,10 +200,6 @@ const TABS = [
   letter-spacing: 0.18em;
   margin-right: 15px; // le titre garde un peu plus d'air que les boutons
 
-  // une ligne et vraiment peu de place : le titre cède sa place au nom du vaisseau
-  @media (min-width: 761px) and (max-width: 900px) {
-    display: none;
-  }
 }
 
 // Contexte (vaisseau / à pied) : même gabarit que PU, Menu et le bouton son (petit, angles droits)
@@ -452,6 +448,62 @@ const TABS = [
   &:focus-visible {
     outline: 2px solid var(--amber);
     outline-offset: 1px;
+  }
+}
+
+// ---- Téléphone : en-tête sur une ligne, marges et onglets réduits ----
+@include phone {
+  .page {
+    gap: 8px;
+    // en bas : bande mémoire (50 px) + crédit SPViewer posé dessus
+    padding: 8px max(8px, env(safe-area-inset-right)) 84px max(8px, env(safe-area-inset-left));
+  }
+
+  .top {
+    flex-wrap: nowrap;
+  }
+
+  // le contexte rétrécit (le nom défile) au lieu de passer sous PU
+  .ctx {
+    overflow: hidden;
+    padding: 4px 8px;
+  }
+
+  .right {
+    gap: 4px;
+  }
+
+  .test {
+    padding: 5px 7px;
+  }
+
+  .test.icon {
+    padding: 3px 5px;
+  }
+
+  // « Exit preview » → « Exit »
+  .long {
+    display: none;
+  }
+
+  // le titre de l'appli cède sa place : le contexte (vaisseau / à pied) est plus utile
+  .brand {
+    display: none;
+  }
+
+  .tabs {
+    margin-bottom: 0;
+  }
+
+  .tab {
+    flex: 1;
+    min-width: 0;
+    padding: 4px 10px;
+    font-size: 11px;
+  }
+
+  .tabs-hint {
+    display: none;
   }
 }
 </style>

@@ -90,4 +90,10 @@ small {
     opacity: 0.45;
   }
 }
+
+@include phone {
+  .ann > div {
+    padding: 3px 2px;
+  }
+}
 </style>

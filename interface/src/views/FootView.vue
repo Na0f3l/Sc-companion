@@ -142,4 +142,12 @@ const loco = computed(() => LOCO[str(`${ACT}state.locomotion`).replace('ACTOR_LO
     font-size: 9px;
   }
 }
+
+// Téléphone : 5 tuiles Environnement sur une ligne, tuiles plus serrées
+@include phone {
+  .tiles {
+    grid-template-columns: repeat(auto-fit, minmax(56px, 1fr));
+    gap: 5px;
+  }
+}
 </style>

@@ -203,4 +203,14 @@ svg {
     @include label;
   }
 }
+
+@include phone {
+  .body {
+    gap: 6px;
+  }
+
+  svg {
+    height: 190px;
+  }
+}
 </style>

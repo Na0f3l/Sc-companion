@@ -2,7 +2,9 @@
 // Fiche du vaisseau : s'ouvre d'un clic sur le nom dans l'en-tête, se ferme d'un clic à côté.
 // Fiche tirée de ships-info.json (wiki) et ships.json (vitesses, G de SPViewer), voir service/src/shipdata.ts.
 // La fiche détaillée (~40 Ko) n'est chargée qu'à la première ouverture : rien en mémoire avant.
-// Affichée hors de l'en-tête (Teleport, position fixe) : le cadre biseauté de l'en-tête la couperait.
+// Affichée hors de l'en-tête (Teleport, position absolue dans la page) : le cadre biseauté de l'en-tête
+// la couperait. Absolue et non fixe : elle défile avec la page, collée au cadre du nom.
+import { pageZoom } from '@/viewport'
 import { computed, onBeforeUnmount, ref, shallowRef, watch } from 'vue'
 import { dataUrl, shipInfo, shipsStamp } from '@/ships'
 
@@ -28,8 +30,10 @@ const all = shallowRef<Info | null>(null)
 
 async function show(): Promise<void> {
   if (!props.ship || !props.anchor) return
+  // positions mesurées à l'écran, ramenées à l'échelle de la page (zoom sur téléphone, voir viewport.ts)
+  const z = pageZoom()
   const r = props.anchor.getBoundingClientRect()
-  pos.value = { top: r.bottom + 6, left: Math.max(8, Math.min(r.left, window.innerWidth - 368)) }
+  pos.value = { top: (r.bottom + window.scrollY) / z + 6, left: Math.max(8, Math.min(r.left / z, window.innerWidth / z - 368)) }
   open.value = true
   if (!all.value) {
     try {
@@ -164,7 +168,7 @@ const sections = computed<{ title: string; rows: Row[] }[]>(() => {
 
 <style scoped lang="scss">
 .shipinfo {
-  position: fixed;
+  position: absolute;
   z-index: 60;
   width: 360px;
   max-width: calc(100vw - 16px);

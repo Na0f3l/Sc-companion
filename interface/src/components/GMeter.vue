@@ -144,4 +144,11 @@ svg {
   font-size: 13px;
   letter-spacing: 0.08em;
 }
+
+@include phone {
+  .gmeter {
+    grid-template-columns: minmax(0, 72px) auto;
+    gap: 8px;
+  }
+}
 </style>

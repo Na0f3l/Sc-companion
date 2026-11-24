@@ -85,4 +85,27 @@ withDefaults(defineProps<{ value: string; label: string; tone?: 'ok' | 'good' | 
 .is-crit :is(.val, .visual) {
   color: var(--red);
 }
+
+@include phone {
+  .tile {
+    gap: 2px;
+    padding: 6px 2px 5px;
+  }
+
+  .visual {
+    max-width: 34px;
+  }
+
+  .spark {
+    --spark-h: 14px;
+  }
+
+  .val {
+    font-size: 13px;
+  }
+
+  .name {
+    font-size: 8px;
+  }
+}
 </style>

@@ -131,4 +131,23 @@ figcaption {
   @include label;
   font-size: 10px;
 }
+
+@include phone {
+  .ring {
+    gap: 2px;
+    padding: 6px 4px 5px;
+  }
+
+  svg {
+    max-width: 44px;
+  }
+
+  .pct {
+    font-size: 15px;
+  }
+
+  .name {
+    font-size: 9px;
+  }
+}
 </style>

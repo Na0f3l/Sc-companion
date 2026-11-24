@@ -100,4 +100,16 @@ i.danger {
 .is-crit i {
   --c: var(--red);
 }
+
+// Téléphone : jauges verticales plus courtes (12 segments de 6 px au lieu de 9)
+@include phone {
+  .seg.is-v i {
+    height: 6px;
+  }
+
+  .seg.is-v {
+    gap: 2px;
+    width: 24px;
+  }
+}
 </style>

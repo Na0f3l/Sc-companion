@@ -199,7 +199,7 @@ const role = computed(() => {
       </div>
     </MfdPanel>
 
-    <MfdPanel title="Propulsion" source="fuel · boost · g_meter" tab="PROPULSION">
+    <MfdPanel class="prop" title="Propulsion" source="fuel · boost · g_meter" tab="PROPULSION">
       <div class="bars">
         <div class="bar">
           <span class="num">{{ Math.round(num(FLI + 'hydrogen_fuel') * 100) }} %</span>
@@ -309,14 +309,11 @@ const role = computed(() => {
   margin-top: calc(var(--mode-h) + var(--mode-gap));
 }
 
-// Disposition : Flight | Propulsion | (Annunciators + Pilot), puis Diagnostics sur toute la largeur.
-// Sous 900 px, la grille automatique de base reprend la main (2 colonnes, puis 1 sur téléphone).
-@media (min-width: 900px) {
-  .flight {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-  }
-}
-
+// Disposition, choisie par viewport.ts (classe cols-N sur <html>, voir son tableau) :
+//  - 3 colonnes : Flight | Propulsion | (Annunciators au-dessus de Pilot) ;
+//  - 2 colonnes : Flight | Propulsion, puis Annunciators | Pilot côte à côte sur toute la largeur ;
+//  - 1 colonne  : tout empilé.
+// Diagnostics toujours sur toute la largeur. Le nombre de colonnes de .flight vient de base.scss (.screens).
 .flight > .full {
   grid-column: 1 / -1;
 }
@@ -327,20 +324,7 @@ const role = computed(() => {
   gap: 14px;
   min-width: 0;
 }
-
-// Entre téléphone et 3 colonnes : Flight | Propulsion, puis Annunciators | Pilot côte à côte
-// sur toute la largeur (sinon la colonne empilée reste seule avec un trou à côté).
-@media (min-width: 621px) and (max-width: 899.98px) {
-  .flight {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-
-  .side {
-    grid-column: 1 / -1;
-    grid-template-rows: none;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-}
+// 2 et 1 colonnes : règles dans styles/base.scss (un sélecteur sur <html> ne passe pas dans un style scoped)
 
 // Écran pilote le plus court possible : contenu tassé en haut (pas réparti sur la hauteur de la rangée),
 // écarts minimaux. :deep(.body) = le contenu de MfdPanel.
@@ -518,5 +502,51 @@ const role = computed(() => {
 
 .sinking {
   color: var(--amber);
+}
+
+// ---- Téléphone : barres plus courtes, Propulsion sur deux colonnes, panneau « non reçu » masqué ----
+@include phone {
+  .top {
+    --vbar-h: 90px;
+    --mode-h: 20px;
+    --mode-gap: 6px;
+    gap: 6px;
+  }
+
+  .pair > * {
+    width: 46px;
+  }
+
+  // barres H-Fuel / Q-Fuel à gauche, G-meter à droite, limite G en dessous
+  .prop :deep(.body) {
+    grid-template-columns: auto minmax(0, 1fr);
+    align-items: center;
+  }
+
+  .prop .bars {
+    gap: 8px;
+  }
+
+  .prop .row {
+    grid-column: 1 / -1;
+  }
+
+  .warns {
+    margin: auto -10px -10px; // suit les marges réduites du panneau (MfdPanel)
+  }
+
+  .esp-warn {
+    padding: 4px 10px;
+    font-size: 11px;
+  }
+
+  .crew :deep(.body) {
+    gap: 8px;
+  }
+
+  // ne montre que des champs que le jeu n'envoie pas : inutile sur un petit écran
+  .ghost {
+    display: none;
+  }
 }
 </style>

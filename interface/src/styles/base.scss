@@ -130,9 +130,26 @@ body {
 .pip { flex: none; width: 10px; height: 10px; border: 1px solid var(--cyan-dim); background: var(--off); }
 .pip.on { background: var(--cyan); border-color: var(--cyan); }
 .pip.busy { background: var(--amber); border-color: var(--amber); }
-.screens { display: grid; gap: 14px; grid-template-columns: repeat(auto-fit, minmax(min(100%, 270px), 1fr)); }
+// Grille des écrans : le nombre de colonnes est décidé par viewport.ts (classe cols-N sur <html>),
+// jamais par une media query (elles voient la largeur réelle, pas la largeur de référence du zoom).
+.screens { display: grid; gap: 14px; grid-template-columns: repeat(3, minmax(0, 1fr)); }
 .screens > .wide { grid-column: span 2; }
-@media (max-width: 620px) { .screens > .wide { grid-column: auto; } }
+html.cols-2 .screens { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+html.cols-1 .screens { grid-template-columns: minmax(0, 1fr); }
+html.cols-1 .screens > .wide { grid-column: auto; }
+// Écran Ship (FlightView) : en 2 colonnes, Annunciators | Pilot côte à côte sur toute la largeur
+html.cols-2 .flight > .side { grid-column: 1 / -1; grid-template-rows: none; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+html.cols-1 .flight > .side { grid-template-rows: none; }
+// colonne unique (très petit écran) : le titre de l'appli cède sa place au nom du vaisseau
+html.cols-1 .top > .brand { display: none; }
+
+// Téléphone : écarts, gros chiffres et moyens chiffres réduits
+@include phone {
+  .screens { gap: 8px; }
+  .big { font-size: 30px; }
+  .mid { font-size: 18px; }
+  .cols { gap: 6px; }
+}
 
 // Pas de coupure globale des animations avec prefers-reduced-motion : Windows l'active dès que
 // « Effets d'animation » est désactivé, ce qui supprimait les alertes et le lissage des instruments.

@@ -55,6 +55,14 @@
     #{$bg};
 }
 
+// Version compacte, un maximum d'infos sans défiler : écran étroit (téléphone en portrait, ≤ 600 px)
+// OU très bas (téléphone en paysage, ≤ 500 px de haut, voir viewport.ts). Au-delà, rien ne change.
+@mixin phone {
+  @media (max-width: 600px), (max-height: 500px) {
+    @content;
+  }
+}
+
 // Petit libellé en capitales espacées.
 @mixin label {
   font-family: var(--font-ui);

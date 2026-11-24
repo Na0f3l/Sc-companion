@@ -119,7 +119,8 @@ const weaponRank = (w: { powered: boolean; ready: boolean }) => (!w.powered ? 0 
 const sortedWeapons = computed(() => [...weapons.value].sort((a, b) => weaponRank(a) - weaponRank(b)))
 
 // Catégories repliées (le chevron), gardées le temps de la session
-const folded = reactive<Record<string, boolean>>({})
+// liste des armes repliée par défaut, dépliée d'un clic
+const unfolded = reactive<Record<string, boolean>>({})
 </script>
 
 <template>
@@ -141,10 +142,13 @@ const folded = reactive<Record<string, boolean>>({})
           type="button"
           class="cat"
           :class="{ fold: c.key === 'weapons' }"
-          :aria-expanded="c.key === 'weapons' ? !folded[c.key] : undefined"
-          @click="c.key === 'weapons' && (folded[c.key] = !folded[c.key])"
+          :aria-expanded="c.key === 'weapons' ? !!unfolded[c.key] : undefined"
+          @click="c.key === 'weapons' && (unfolded[c.key] = !unfolded[c.key])"
         >
-          <span v-if="c.key === 'weapons' && weapons.length" class="chev" :class="{ shut: folded[c.key] }">⌄</span>
+          <!-- triangle plein comme les flèches du menu, centré dans sa boîte : il tourne sur lui-même -->
+          <svg v-if="c.key === 'weapons' && weapons.length" viewBox="0 0 10 10" class="chev" :class="{ shut: !unfolded[c.key] }" aria-hidden="true">
+            <path d="M1.5 2.75h7L5 7.25z" />
+          </svg>
           <span v-else class="chev none" />
           <svg viewBox="0 0 24 24" class="ico" aria-hidden="true"><path :d="ICONS[c.icon]" /></svg>
           <span class="name">{{ c.label }}</span>
@@ -154,7 +158,7 @@ const folded = reactive<Record<string, boolean>>({})
         </button>
 
         <!-- Armes : une ligne par arme, sous la catégorie -->
-        <ul v-if="c.key === 'weapons' && !folded[c.key]" class="items">
+        <ul v-if="c.key === 'weapons' && unfolded[c.key]" class="items">
           <li v-for="(w, i) in sortedWeapons" :key="i" :class="{ off: !w.powered }">
             <span class="name">{{ w.maker }} {{ w.type }}</span>
             <span class="size">{{ w.size }}</span>
@@ -240,9 +244,12 @@ const folded = reactive<Record<string, boolean>>({})
 }
 
 .chev {
+  flex: none;
+  display: block;
   width: 10px;
-  font-size: 12px;
-  line-height: 1;
+  height: 10px;
+  fill: currentColor;
+  transform-origin: 50% 50%;
   transition: transform 0.15s;
 
   &.shut { transform: rotate(-90deg); }
@@ -334,5 +341,16 @@ const folded = reactive<Record<string, boolean>>({})
 
 @keyframes blink {
   50% { opacity: 0.45; }
+}
+
+// Téléphone : lignes plus serrées
+@include phone {
+  .cat {
+    padding: 3px 4px;
+  }
+
+  .items li {
+    padding: 2px 6px 2px 30px;
+  }
 }
 </style>
