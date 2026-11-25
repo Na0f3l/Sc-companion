@@ -106,7 +106,7 @@ function notifEvent(text: string, me: string): [LogLevel, string] | null {
   if ((m = t.match(/^Fined (\d+) UEC/))) return ['note', `Fined ${Number(m[1]).toLocaleString('en-US')} UEC`]
   if ((m = t.match(/^Vehicle Impounded:\s*(.*)/))) return ['note', `Ship impounded: ${m[1]}`]
   if ((m = t.match(/^Quantum Travel Calibration Started By (\S*)/))) return ['info', m[1] && m[1] !== me ? `Quantum travel (${m[1]})` : 'Quantum travel']
-  if (t.startsWith('Hangar Request Completed')) return ['note', 'Ship ready in hangar']
+  if (t.startsWith('Hangar Request Completed')) return ['note', 'Hangar ready'] // hangar attribué à la demande d'atterrissage, vaisseau pas encore posé
   // (canaux radio des vaisseaux, « You have joined / left the channel » : ignorés, le jeu en fait rejoindre et
   // quitter en boucle à proximité d'autres vaisseaux ; montée / sortie = prise des commandes, voir seatLabel)
   if ((m = t.match(/^Contract Accepted:\s*(.*)/))) return ['note', `Contract accepted: ${m[1]}`]
