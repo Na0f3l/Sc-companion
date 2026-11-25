@@ -2,7 +2,7 @@
 // Tuile du HUD : un visuel (picto, jauge…) dans le slot, la valeur dessous, un libellé discret.
 // soon : donnée prévue par le jeu mais pas encore envoyée → tuile grisée avec « coming soon » (comme Q-Fuel)
 // slot « spark » (facultatif) : mini-courbe d'historique collée au bas de la tuile
-withDefaults(defineProps<{ value: string; label: string; tone?: 'ok' | 'good' | 'warn' | 'crit'; soon?: boolean }>(), {
+withDefaults(defineProps<{ value: string; label: string; tone?: 'ok' | 'good' | 'warn' | 'crit' | 'cold' | 'freeze'; soon?: boolean }>(), {
   tone: 'ok',
   soon: false,
 })
@@ -84,6 +84,15 @@ withDefaults(defineProps<{ value: string; label: string; tone?: 'ok' | 'good' | 
 
 .is-crit :is(.val, .visual) {
   color: var(--red);
+}
+
+// Froid : bleu glacier puis bleu soutenu (couleurs fixes, distinctes du cyan du HUD et indépendantes du thème)
+.is-cold :is(.val, .visual) {
+  color: #7fd8ff;
+}
+
+.is-freeze :is(.val, .visual) {
+  color: #3d7bff;
 }
 
 @include phone {

@@ -37,19 +37,24 @@ const hPa = computed(() => num(V + 'pressure') * 1013.25) // le jeu envoie des a
 const extTemp = computed(() => num(E + 'external_temperature'))
 const radiation = computed(() => num(E + 'ambient_radiation_rate'))
 
-type Tone = 'ok' | 'good' | 'warn' | 'crit'
-// Température extérieure : orange au-delà de 100 °C ou en dessous de -75 °C, rouge au-delà de 150 °C ou sous -120 °C
+type Tone = 'ok' | 'good' | 'warn' | 'crit' | 'cold' | 'freeze'
+// Température extérieure : orange au-delà de 100 °C, rouge au-delà de 150 °C ;
+// bleu clair sous -75 °C, bleu soutenu sous -120 °C (chaud = rouge, froid = bleu, comme le corps)
 const extTone = computed<Tone>(() => {
   const t = extTemp.value
-  if (t > 150 || t < -120) return 'crit'
-  if (t > 100 || t < -75) return 'warn'
+  if (t > 150) return 'crit'
+  if (t > 100) return 'warn'
+  if (t < -120) return 'freeze'
+  if (t < -75) return 'cold'
   return 'ok'
 })
-// Température du corps : mêmes seuils que les alertes (alerts.ts)
+// Température du corps : mêmes seuils que les alertes (alerts.ts). Chaud = orange/rouge, froid = bleu clair/bleu soutenu.
 const bodyTone = computed<Tone>(() => {
   const t = bodyTemp.value
-  if (t > 40 || t < 34) return 'crit'
-  if (t > 39 || t < 35) return 'warn'
+  if (t > 40) return 'crit'
+  if (t > 39) return 'warn'
+  if (t < 34) return 'freeze'
+  if (t < 35) return 'cold'
   return 'ok'
 })
 
