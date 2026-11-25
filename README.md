@@ -24,6 +24,8 @@ cd service   && npm install && node src/index.ts  # puis ouvrir http://localhost
 
 Sans terminal : double-clic sur `Lancer.vbs` (ou un raccourci vers `wscript.exe "…\Lancer.vbs"` avec `icone.ico`). Il démarre le service en arrière-plan s'il ne tourne pas déjà, puis ouvre l'interface ; les messages du service vont dans `service/service.log`. Pour arrêter le service : terminer `node.exe` dans le Gestionnaire des tâches.
 
+Données de l'utilisateur (sessions de jeu, réglages communs, données vaisseaux mises à jour) : `%LOCALAPPDATA%\SC Companion\` (copiées depuis l'ancien `service/data/` au premier lancement). Dossier du jeu : celui du dernier lancement noté par le launcher RSI (LIVE, PTU, autre disque…), sinon `C:\Program Files\Roberts Space Industries\StarCitizen\LIVE` ; `--game-dir <dossier>` le force. Si le service tourne déjà, un second lancement le signale et s'arrête sans rien toucher.
+
 Le service sert lui-même l'interface compilée : pas besoin du serveur de développement Vite pour jouer (~500 Mo économisés). `npm run dev` dans `interface/` ne sert qu'à développer.
 
 Options du service : `--replay ../telemetrie/captures` (rejeu de captures), `--game-dir <dossier>` (jeu hors de `…\StarCitizen\LIVE`), `--port <n>`. Le lancer avec `node` directement plutôt que `npm run` (npm garde un processus parent de ~60 Mo).
@@ -53,3 +55,9 @@ Données des vaisseaux (`interface/public/data/`, régénérées par `npm run sh
 ## Avertissement
 
 Projet personnel, non affilié à Cloud Imperium Games. Le service est en lecture seule : il n'envoie aucune commande au jeu.
+
+## Licence
+
+SC Companion est libre et open source, sous licence MIT (voir `LICENSE`). Les contenus tiers (sons, polices, données des vaisseaux, schéma de télémétrie) gardent leur propre licence : voir « Crédits » ci-dessus et la fenêtre « About » de l'interface.
+
+Projet de fan non officiel, sans lien avec Cloud Imperium Games. Star Citizen®, Roberts Space Industries® et Cloud Imperium® sont des marques de Cloud Imperium Rights LLC.

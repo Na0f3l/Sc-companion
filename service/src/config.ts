@@ -1,9 +1,10 @@
 // Réglages du service, communs à tous les écrans (PC, téléphone) : ceux qui agissent sur un calcul fait ici,
 // comme la détection de fuite mémoire. Les écrans les modifient par le WebSocket ({ type: 'config', … }) et
-// les reçoivent dans l'état (clés cfg.*). Gardés dans service/data/config.json (non publié, voir .gitignore).
+// les reçoivent dans l'état (clés cfg.*). Gardés dans config.json, dans le dossier des données (paths.ts).
 import fs from 'node:fs'
 import path from 'node:path'
 import type { Flat } from './flat.ts'
+import { DATA_DIR } from './paths.ts'
 
 export interface Config {
   leakRate: number // Mo/s : croissance de la mémoire du jeu (pente sur 15 s) considérée comme anormale
@@ -14,7 +15,7 @@ export const DEFAULTS: Config = { leakRate: 100, leakDuration: 45 }
 // bornes acceptées (un écran ne peut pas envoyer n'importe quoi)
 const LIMITS: Record<keyof Config, [number, number]> = { leakRate: [20, 1000], leakDuration: [10, 600] }
 
-const FILE = path.join(import.meta.dirname, '..', 'data', 'config.json')
+const FILE = path.join(DATA_DIR, 'config.json')
 
 function load(): Config {
   try {

@@ -25,6 +25,7 @@ import { createSystemMonitor } from './system.ts'
 import { createGameLogReader } from './gamelog.ts'
 import { configFlat, updateConfig } from './config.ts'
 import { createSessionRecorder } from './sessions.ts'
+import { gameDir } from './paths.ts'
 import { hasInterface, serveStatic } from './static.ts'
 import { checkLatest, serveData } from './shipdata.ts'
 
@@ -56,7 +57,7 @@ const system = createSystemMonitor((s) => {
     if (frame) observe(flatten(frame))
   }
 }) // mémoire SC / système, CPU, GPU, fuite
-const gameLog = createGameLogReader(opt('game-dir'), (e) => sessions.onEvent(e)) // mode de jeu, blessures, événements
+const gameLog = createGameLogReader(() => gameDir(opt('game-dir')), (e) => sessions.onEvent(e)) // mode de jeu, blessures, événements
 
 // ---- Diffusion ------------------------------------------------------------------
 let state: Flat = {} // dernier état envoyé aux écrans
@@ -121,10 +122,6 @@ function onLastClientGone(): void {
   console.log('No clients left: broadcasting paused')
 }
 
-// Démarrage des mesures (après les déclarations ci-dessus, qu'utilise la première mesure) ; le système d'abord :
-// la session doit être ouverte avant que le Game.log n'envoie ses événements
-system.start()
-gameLog.start()
 
 // ---- Serveurs -------------------------------------------------------------------
 // Adresses IPv4 du PC joignables depuis le téléphone : réseau privé d'abord (192.168 puis 10 puis 172.16-31,
@@ -221,7 +218,31 @@ for (const sig of ['SIGINT', 'SIGTERM', 'SIGBREAK'] as const) {
   })
 }
 
+// Port déjà pris : SC Companion tourne déjà (on le dit et on s'arrête, sans rien toucher), ou un autre programme
+// l'utilise. Les mesures ne démarrent qu'une fois le port obtenu : un second service lancé par erreur ne doit
+// pas toucher aux sessions du premier (il clôturerait celle en cours).
+async function onListenError(e: NodeJS.ErrnoException): Promise<void> {
+  if (e.code !== 'EADDRINUSE') throw e
+  try {
+    const res = await fetch(`http://127.0.0.1:${PORT}/health`, { signal: AbortSignal.timeout(2000) })
+    if (res.ok && 'clients' in ((await res.json()) as object)) {
+      console.log(`SC Companion is already running: http://localhost:${PORT}`)
+      process.exit(0)
+    }
+  } catch {
+    /* pas SC Companion */
+  }
+  console.error(`Port ${PORT} is already used by another program. Start with --port <number> (e.g. --port ${PORT + 1}).`)
+  process.exit(1)
+}
+server.on('error', (e) => void onListenError(e))
+wss.on('error', () => {}) // même erreur, relayée par le serveur WebSocket : déjà traitée ci-dessus
+
 server.listen(PORT, () => {
+  // Démarrage des mesures ; le système d'abord : la session doit être ouverte avant que le Game.log n'envoie
+  // ses événements
+  system.start()
+  gameLog.start()
   void checkLatest() // nouvelle version du jeu sur le wiki ? (un appel, en arrière-plan)
   console.log(`SC Companion service : http://localhost:${PORT}  (ws /ws, health /health)`)
   if (!hasInterface()) console.log('Interface not built yet: run "npm run build" in interface/')

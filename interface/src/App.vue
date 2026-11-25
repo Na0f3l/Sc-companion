@@ -21,8 +21,12 @@ import DataUpdate from './components/DataUpdate.vue'
 import MobileConnect from './components/MobileConnect.vue'
 import { shipName } from './ships'
 
-// ?demo dans l'adresse : ouvre directement le mode démo (lien à partager, page hébergée sans service)
-onMounted(() => (new URLSearchParams(location.search).has('demo') ? showDemo('ship') : connect()))
+// Toujours connecté au service (sans service, simples tentatives de reconnexion). ?demo dans l'adresse ouvre la
+// démo d'emblée (lien à partager, page hébergée sans service) ; elle se ferme seule si le jeu est en partie.
+onMounted(() => {
+  connect()
+  if (new URLSearchParams(location.search).has('demo')) showDemo('ship')
+})
 
 // Teinte globale : un attribut sur <html>, les variables CSS font le reste
 watchEffect(() => {

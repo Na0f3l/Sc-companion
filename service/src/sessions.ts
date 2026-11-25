@@ -5,7 +5,7 @@
 // Alt-F4 suivi d'une relance immédiate (crash, fuite) reste la même session. Si le service redémarre pendant
 // la partie, il reprend la session en cours.
 //
-// Un fichier par session, service/data/sessions/<début>.jsonl (non publié, voir .gitignore), écrit au fil de
+// Un fichier par session, <dossier des données>/sessions/<début>.jsonl (paths.ts), écrit au fil de
 // l'eau (par paquets toutes les 10 s) : rien n'est perdu si le service s'arrête. Une ligne par donnée :
 //   {"v":1,"start":ms}                en-tête
 //   [t s, Mo du jeu, % engagement]    une mesure (toutes les 2 s)
@@ -18,8 +18,9 @@ import fs from 'node:fs'
 import path from 'node:path'
 import type { LogEvent } from './gamelog.ts'
 import type { Sample } from './system.ts'
+import { DATA_DIR } from './paths.ts'
 
-const DIR = process.env.SCC_SESSIONS_DIR ?? path.join(import.meta.dirname, '..', 'data', 'sessions') // (autre dossier : tests)
+const DIR = process.env.SCC_SESSIONS_DIR ?? path.join(DATA_DIR, 'sessions') // (autre dossier : tests)
 const SAVED = path.join(DIR, 'saved')
 const GRACE_S = 30 // jeu fermé depuis plus longtemps : session terminée
 const KEEP = 5 // sessions non sauvegardées gardées

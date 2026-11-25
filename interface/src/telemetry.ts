@@ -53,8 +53,13 @@ function clear(): void {
   for (const k of Object.keys(tm)) delete tm[k]
 }
 
+// Dernier état reçu du service, tenu à jour même pendant la démo (non observé : simple copie) : il permet de
+// fermer la démo dès que le jeu est lancé, et de repartir de l'état réel en la quittant.
+const live: Record<string, Value> = {}
+let liveSource = ''
+const inGame = () => live['game.mode'] === 'pu' || live['game.mode'] === 'ac' // en partie (pas au menu)
+
 export function connect(): void {
-  if (demo.value) return
   const sock = new WebSocket(`${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}/ws`)
   link.value = 'connecting'
 
@@ -67,6 +72,18 @@ export function connect(): void {
     if (ws !== sock) return
     const msg = JSON.parse(e.data as string) as Msg
     if (msg.type === 'snapshot') {
+      for (const k of Object.keys(live)) delete live[k]
+      Object.assign(live, msg.data)
+      liveSource = msg.source
+    } else {
+      Object.assign(live, msg.set)
+      for (const k of msg.del) delete live[k]
+    }
+    if (demo.value) {
+      if (inGame()) exitDemo() // le jeu est lancé : fin de la démo, place au direct
+      return
+    }
+    if (msg.type === 'snapshot') {
       clear()
       Object.assign(tm, msg.data)
       source.value = msg.source
@@ -76,10 +93,11 @@ export function connect(): void {
     }
   }
   sock.onclose = () => {
-    if (ws !== sock) return // ancienne connexion, fermée volontairement (mode démo)
+    if (ws !== sock) return
     ws = null
     link.value = 'offline'
-    clear()
+    for (const k of Object.keys(live)) delete live[k]
+    if (!demo.value) clear() // en démo, l'affichage d'exemple reste
     retry = setTimeout(connect, delay)
     delay = Math.min(delay * 2, 5000) // 0,5 s, 1 s, 2 s… plafonné à 5 s
   }
@@ -92,22 +110,20 @@ export function connect(): void {
  */
 export function sendConfig(key: 'leakRate' | 'leakDuration', value: number): void {
   tm[key === 'leakRate' ? 'cfg.leak_rate' : 'cfg.leak_duration'] = value
-  if (ws?.readyState === WebSocket.OPEN) ws.send(JSON.stringify({ type: 'config', [key]: value }))
+  if (!demo.value && ws?.readyState === WebSocket.OPEN) ws.send(JSON.stringify({ type: 'config', [key]: value }))
 }
 
 // ---- Mode démo ----------------------------------------------------------------------
-// Voir les écrans sans le jeu (ni le service) : la connexion est coupée et l'état est figé
-// sur des valeurs d'exemple (demo.ts). Pas de simulation, juste les panneaux.
+// Voir les écrans sans jouer : l'affichage est figé sur des valeurs d'exemple (demo.ts). Pas de simulation, juste
+// les panneaux. Seulement hors partie (jeu fermé ou au menu) : la connexion au service reste ouverte en
+// arrière-plan, et la démo se ferme d'elle-même dès que le jeu passe en partie (univers persistant, Arena Commander).
 export const demo = ref(false)
 export const demoView = ref<DemoView>('ship')
 
 export function showDemo(view: DemoView): void {
+  if (inGame()) return // en partie : le direct a la priorité
   if (!demo.value) {
     demo.value = true
-    clearTimeout(retry)
-    ws?.close()
-    ws = null
-    link.value = 'online'
     source.value = 'demo'
   }
   demoView.value = view
@@ -118,6 +134,6 @@ export function showDemo(view: DemoView): void {
 export function exitDemo(): void {
   demo.value = false
   clear()
-  source.value = ''
-  connect()
+  Object.assign(tm, live) // reprise immédiate sur l'état réel (la connexion n'a jamais été coupée)
+  source.value = liveSource
 }

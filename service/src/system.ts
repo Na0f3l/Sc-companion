@@ -89,8 +89,16 @@ function loadGpu(): Gpu | null {
     return {
       sample() {
         if (collect(q[0]) !== 0) return null
-        let util = 0
-        if (!each(engine[0], (name, v) => { if (name.endsWith('engtype_3D')) util += v })) return null
+        // charge 3D par carte (instance « …_luid_0x…_0x…_phys_0_eng_… »), puis la carte la plus chargée : sur un PC
+        // à deux GPU (portable Intel + NVIDIA / AMD), additionner les deux fausserait la charge
+        const perCard = new Map<string, number>()
+        const ok = each(engine[0], (name, v) => {
+          if (!name.endsWith('engtype_3D')) return
+          const card = name.match(/luid_0x[0-9a-f]+_0x[0-9a-f]+/i)?.[0] ?? ''
+          perCard.set(card, (perCard.get(card) ?? 0) + v)
+        })
+        if (!ok) return null
+        const util = Math.max(0, ...perCard.values())
         let vramBytes = 0
         if (vram[0]) each(vram[0], (_, v) => { vramBytes = Math.max(vramBytes, v) })
         return { util: Math.min(100, util), vramBytes }

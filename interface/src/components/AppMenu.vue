@@ -8,11 +8,18 @@ import { TESTS, type TestKind, shownAlert, triggerTest } from '@/alerts'
 import { flash } from '@/hit'
 import { ALERT_GROUPS, COMPONENT_ALERTS, settings } from '@/settings'
 import { awake } from '@/wakelock'
+import AboutPanel from './AboutPanel.vue'
 
 // méthode en cours (diagnostic : la vidéo de repli ne marche pas sur tous les téléphones)
 const AWAKE_NOTE = { system: 'Active · system lock', video: 'Active · video fallback', pending: 'Tap anywhere on the page to activate' }
 
 const open = ref(false)
+// fenêtre About : hors du panneau (qui se ferme), ouverte par la dernière entrée du menu
+const about = ref<InstanceType<typeof AboutPanel>>()
+function openAbout(): void {
+  open.value = false
+  about.value?.open()
+}
 const touch = window.matchMedia('(pointer: coarse)').matches // téléphone, tablette
 const testsOpen = ref(false)
 const alertsOpen = ref(false)
@@ -163,7 +170,16 @@ function onComponent(): void {
           <button type="button" class="hit" @click="test('hit')"><span class="sw" />Hit flash</button>
         </div>
       </section>
+
+      <!-- crédits et mentions légales -->
+      <section>
+        <button type="button" class="row" @click="openAbout">
+          <span>About</span>
+          <span aria-hidden="true">ⓘ</span>
+        </button>
+      </section>
     </div>
+    <AboutPanel ref="about" />
   </div>
 </template>
 

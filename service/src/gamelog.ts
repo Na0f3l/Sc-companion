@@ -15,7 +15,6 @@ import type { Flat } from './flat.ts'
 
 export type GameMode = 'pu' | 'ac' | 'menu'
 
-const DEFAULT_DIR = 'C:\\Program Files\\Roberts Space Industries\\StarCitizen\\LIVE'
 const POLL_MS = 2000
 const MAX_FIRST_READ = 8 * 2 ** 20 // octets lus au plus au démarrage (fin du fichier)
 const MODE_RX = /gamerules="([^"]+)"|Requesting game mode [^/\s"]*\/(\w+)|(<Join PU>)|(<SystemQuit>)/g
@@ -138,8 +137,9 @@ function lastMode(text: string): GameMode | null {
 export type { LogEvent }
 
 /** onEvent : appelé pour chaque nouvel événement retenu (enregistrement des sessions, sessions.ts). */
-export function createGameLogReader(gameDir = DEFAULT_DIR, onEvent?: (e: LogEvent) => void) {
-  const file = path.join(gameDir, 'Game.log')
+/** gameDir : dossier du jeu, relu à chaque passage (paths.ts : suit le launcher, LIVE / PTU…). */
+export function createGameLogReader(gameDir: () => string, onEvent?: (e: LogEvent) => void) {
+  let file = path.join(gameDir(), 'Game.log')
   let timer: NodeJS.Timeout | null = null
   let pos = 0
   let rest = '' // fin de ligne incomplète, gardée pour la lecture suivante
@@ -284,6 +284,9 @@ export function createGameLogReader(gameDir = DEFAULT_DIR, onEvent?: (e: LogEven
   }
 
   function poll(): void {
+    // autre dossier du jeu (lancé en PTU après LIVE…) : on repart du début de son Game.log
+    const now = path.join(gameDir(), 'Game.log')
+    if (now !== file) { file = now; pos = Infinity } // → « nouveau fichier » ci-dessous : tout repart de zéro
     let size: number
     try {
       size = fs.statSync(file).size

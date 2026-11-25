@@ -16,6 +16,7 @@ import fs from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import type http from 'node:http'
+import { DATA_DIR } from './paths.ts'
 
 const WIKI = 'https://api.star-citizen.wiki/api/vehicles'
 const WIKI_VERSIONS = 'https://api.star-citizen.wiki/api/game-versions'
@@ -24,7 +25,7 @@ const SPV = 'https://api.spviewer.eu/spvapi/data/community/public/vehicles'
 const HERE = path.dirname(fileURLToPath(import.meta.url))
 export const DEFAULT_DIR = path.resolve(HERE, '../../interface/public/data')
 const BUILT_DIR = path.resolve(HERE, '../../interface/dist/data') // copie de DEFAULT_DIR faite par le build
-export const USER_DIR = path.resolve(HERE, '../data')
+export const USER_DIR = DATA_DIR // copie mise à jour depuis l'interface (dossier des données, paths.ts)
 const FILES = ['ships.json', 'ships-info.json']
 
 type Num = number | null | undefined
