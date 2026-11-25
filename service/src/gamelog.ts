@@ -148,6 +148,7 @@ export function createGameLogReader(gameDir: () => string, onEvent?: (e: LogEven
   const injuries = new Map<string, { tier: number; at: number }>()
   let events: LogEvent[] = []
   let eventsJson = '[]'
+  let dirty = true // liste changée depuis le dernier JSON
   let me = { id: '', name: '' } // joueur (ligne de connexion, au début du log)
   const contracts = new Map<string, string>() // identifiant de mission → nom du contrat (pour l'abandon)
   const myItems = new Set<string>() // identifiants des objets portés par le joueur (reconnaître son corps)
@@ -174,6 +175,7 @@ export function createGameLogReader(gameDir: () => string, onEvent?: (e: LogEven
     const isDeath = (l: LogLevel) => l === 'death' || l === 'deathp'
     if (isDeath(level) && events.some((e) => isDeath(e[1]) && Math.abs(e[0] - t) < 60_000)) return
     events.push([t, level, label])
+    dirty = true
     onEvent?.([t, level, label])
   }
 
@@ -265,22 +267,25 @@ export function createGameLogReader(gameDir: () => string, onEvent?: (e: LogEven
     }
   }
 
-  // Retire ce qui est sorti de la courbe (toutes les 2 s, sur quelques dizaines d'entrées au plus)
+  // Retire ce qui est sorti de la courbe ; le JSON envoyé aux écrans n'est refait que si la liste a changé
+  // (nouvel événement ou un ancien qui sort), pas toutes les 2 s
   function pruneEvents(): void {
     const since = Date.now() - EVENT_WINDOW_MS
-    events = events.filter((e) => e[0] >= since).sort((a, b) => a[0] - b[0]).slice(-MAX_EVENTS)
+    const kept = events.filter((e) => e[0] >= since)
+    if (!dirty && kept.length === events.length) return
+    events = kept.sort((a, b) => a[0] - b[0]).slice(-MAX_EVENTS)
     eventsJson = JSON.stringify(events)
+    dirty = false
   }
 
-  function readFrom(start: number, end: number): string {
-    const fd = fs.openSync(file, 'r') // Node ouvre en lecture partagée : le jeu peut continuer d'écrire
-    try {
-      const buf = Buffer.alloc(end - start)
-      fs.readSync(fd, buf, 0, buf.length, start)
-      return buf.toString('utf8')
-    } finally {
-      fs.closeSync(fd)
-    }
+  // Lecture par morceaux de 1 Mo dans un tampon réutilisé : au premier passage (8 Mo de log), pas de tampon ni de
+  // chaîne de 8 à 16 Mo qui resteraient en mémoire jusqu'à un grand nettoyage de V8 (rare : le tas est petit)
+  const CHUNK = 1 << 20
+  let chunkBuf: Buffer | null = null
+  function readChunk(fd: number, start: number, end: number): string {
+    chunkBuf ??= Buffer.allocUnsafe(CHUNK)
+    const n = fs.readSync(fd, chunkBuf, 0, end - start, start)
+    return chunkBuf.toString('utf8', 0, n)
   }
 
   function poll(): void {
@@ -294,14 +299,28 @@ export function createGameLogReader(gameDir: () => string, onEvent?: (e: LogEven
       mode = null // pas de Game.log (jeu jamais lancé, autre dossier)
       return
     }
-    if (size < pos) { pos = 0; rest = ''; mode = null; injuries.clear(); events = []; me = { id: '', name: '' }; wrecks.clear(); pendingKills = []; downedAt = null; myItems.clear() } // nouveau fichier (jeu relancé)
+    if (size < pos) { pos = 0; rest = ''; mode = null; injuries.clear(); events = []; dirty = true; me = { id: '', name: '' }; wrecks.clear(); pendingKills = []; downedAt = null; myItems.clear() } // nouveau fichier (jeu relancé)
     if (size === pos) { flushKills(); pruneEvents(); return }
     if (pos === 0 && size > MAX_FIRST_READ) pos = size - MAX_FIRST_READ // premier passage : la fin suffit
-    const text = rest + readFrom(pos, size)
-    pos = size
-    const cut = text.lastIndexOf('\n')
-    rest = cut >= 0 ? text.slice(cut + 1) : text
-    const lines = cut >= 0 ? text.slice(0, cut) : ''
+    const fd = fs.openSync(file, 'r') // Node ouvre en lecture partagée : le jeu peut continuer d'écrire
+    try {
+      while (pos < size) {
+        const end = Math.min(size, pos + CHUNK)
+        const text = rest + readChunk(fd, pos, end)
+        pos = end
+        const cut = text.lastIndexOf('\n')
+        rest = cut >= 0 ? text.slice(cut + 1) : text
+        if (cut >= 0) readLines(text.slice(0, cut))
+      }
+    } finally {
+      fs.closeSync(fd)
+    }
+    flushKills()
+    pruneEvents()
+  }
+
+  // Un bloc de lignes complètes : mode de jeu, blessures et soins, événements
+  function readLines(lines: string): void {
     const found = lastMode(lines)
     if (found) mode = found
     // blessures et soins dans l'ordre du log : une blessure soignée puis reprise reste affichée
@@ -319,8 +338,6 @@ export function createGameLogReader(gameDir: () => string, onEvent?: (e: LogEven
     }
     changes.sort((a, b) => a[0] - b[0]).forEach(([, apply]) => apply())
     readEvents(lines)
-    flushKills()
-    pruneEvents()
   }
 
   return {

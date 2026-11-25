@@ -19,13 +19,14 @@ import os from 'node:os'
 import { WebSocketServer, type WebSocket } from 'ws'
 import { diff, flatten, type Flat } from './flat.ts'
 import { createReplaySource } from './sources/replay.ts'
-import { createLiveSource } from './sources/live.ts'
+import { createLazyLiveSource } from './sources/lazy.ts'
 import type { Source } from './sources/source.ts'
 import { createSystemMonitor } from './system.ts'
 import { createGameLogReader } from './gamelog.ts'
 import { configFlat, updateConfig } from './config.ts'
 import { createSessionRecorder } from './sessions.ts'
 import { gameDir } from './paths.ts'
+import { createTray, openUrl } from './tray.ts'
 import { hasInterface, serveStatic } from './static.ts'
 import { checkLatest, serveData } from './shipdata.ts'
 
@@ -40,7 +41,7 @@ const TICK_MS = 200 // 5 envois par seconde au maximum
 
 // Par défaut : le jeu en direct. --replay <fichier|dossier> pour rejouer des captures.
 const replay = opt('replay')
-const source: Source = replay ? createReplaySource(replay) : createLiveSource(opt('addr'))
+const source: Source = replay ? createReplaySource(replay) : createLazyLiveSource(opt('addr'))
 // Mesures et lecture du Game.log : en permanence (une mesure / 2 s), écran ouvert ou non, pour enregistrer
 // les sessions de jeu. La télémétrie du jeu (source) est ouverte tant que le jeu tourne (ou qu'un écran est
 // connecté) : sans écran, une seule trame décodée toutes les 2 s (siège, solde) ; la diffusion attend un écran.
@@ -49,6 +50,12 @@ let gameRunning = false
 const system = createSystemMonitor((s) => {
   sessions.onSample(s)
   gameRunning = s.scMb !== null
+  // infobulle de l'icône : état du jeu (texte changé seulement quand il change, au dixième de Go près)
+  tray?.setTip(
+    s.scMb === null
+      ? 'SC Companion · game not running'
+      : `SC Companion · Star Citizen ${(s.scMb / 1024).toFixed(1)} GB${sessions.current() ? ' · recording' : ''}`,
+  )
   if (replay) return // captures rejouées : seulement avec un écran, comme avant
   if (gameRunning) source.start()
   else if (!clients.size) source.stop()
@@ -109,6 +116,7 @@ function tick(): void {
 
 function onFirstClient(): void {
   source.start()
+  system.setGpu(true) // la charge GPU ne sert qu'à l'affichage
   tick()
   timer = setInterval(tick, TICK_MS)
   console.log('Client connected: broadcasting started')
@@ -118,6 +126,7 @@ function onLastClientGone(): void {
   if (timer) clearInterval(timer)
   timer = null
   if (!gameRunning || replay) source.stop() // jeu lancé : la télémétrie reste ouverte (siège, solde)
+  system.setGpu(false)
   state = {}
   console.log('No clients left: broadcasting paused')
 }
@@ -210,12 +219,30 @@ wss.on('connection', (ws) => {
   })
 })
 
-// Ctrl+C / fermeture : écrire les mesures en attente (la session reste ouverte, reprise au prochain démarrage)
-for (const sig of ['SIGINT', 'SIGTERM', 'SIGBREAK'] as const) {
-  process.on(sig, () => {
-    sessions.flush()
-    process.exit(0)
-  })
+// Arrêt (Ctrl+C, fermeture, « Quit » de l'icône) : écrire les mesures en attente (la session reste ouverte,
+// reprise au prochain démarrage) et retirer l'icône
+function shutdown(): void {
+  sessions.flush()
+  tray?.remove()
+  process.exit(0)
+}
+for (const sig of ['SIGINT', 'SIGTERM', 'SIGBREAK'] as const) process.on(sig, shutdown)
+
+// Icône dans la zone de notification (tray.ts) ; --no-tray pour s'en passer
+let tray: ReturnType<typeof createTray> | null = null
+function startTray(): void {
+  if (process.platform !== 'win32' || args.includes('--no-tray')) return
+  const url = (q = '') => `http://localhost:${PORT}/${q}`
+  try {
+    tray = createTray({
+      open: () => openUrl(url()),
+      sessions: () => openUrl(url('?sessions')),
+      mobile: () => openUrl(url('?mobile')),
+      quit: shutdown,
+    })
+  } catch (e) {
+    console.error('Tray icon unavailable:', (e as Error).message)
+  }
 }
 
 // Port déjà pris : SC Companion tourne déjà (on le dit et on s'arrête, sans rien toucher), ou un autre programme
@@ -243,6 +270,7 @@ server.listen(PORT, () => {
   // ses événements
   system.start()
   gameLog.start()
+  startTray()
   void checkLatest() // nouvelle version du jeu sur le wiki ? (un appel, en arrière-plan)
   console.log(`SC Companion service : http://localhost:${PORT}  (ws /ws, health /health)`)
   if (!hasInterface()) console.log('Interface not built yet: run "npm run build" in interface/')

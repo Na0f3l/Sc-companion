@@ -22,7 +22,7 @@ cd interface && npm install && npm run build   # une fois (et après chaque modi
 cd service   && npm install && node src/index.ts  # puis ouvrir http://localhost:2950 (ou http://<ip-du-pc>:2950 sur le téléphone)
 ```
 
-Sans terminal : double-clic sur `Lancer.vbs` (ou un raccourci vers `wscript.exe "…\Lancer.vbs"` avec `icone.ico`). Il démarre le service en arrière-plan s'il ne tourne pas déjà, puis ouvre l'interface ; les messages du service vont dans `service/service.log`. Pour arrêter le service : terminer `node.exe` dans le Gestionnaire des tâches.
+Sans terminal : double-clic sur `Lancer.vbs` (ou un raccourci vers `wscript.exe "…\Lancer.vbs"` avec `icone.ico`). Il démarre le service en arrière-plan s'il ne tourne pas déjà, puis ouvre l'interface ; les messages du service vont dans `service/service.log`. Une icône SC Companion apparaît dans la zone de notification (à côté de l'horloge) : double-clic pour ouvrir l'interface, clic droit pour Sessions, Mobile connect ou **Quit** (arrêt du service) ; l'infobulle indique l'état du jeu. `--no-tray` pour s'en passer.
 
 Données de l'utilisateur (sessions de jeu, réglages communs, données vaisseaux mises à jour) : `%LOCALAPPDATA%\SC Companion\` (copiées depuis l'ancien `service/data/` au premier lancement). Dossier du jeu : celui du dernier lancement noté par le launcher RSI (LIVE, PTU, autre disque…), sinon `C:\Program Files\Roberts Space Industries\StarCitizen\LIVE` ; `--game-dir <dossier>` le force. Si le service tourne déjà, un second lancement le signale et s'arrête sans rien toucher.
 

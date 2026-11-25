@@ -34,7 +34,9 @@ const LIBS = [
 </script>
 
 <template>
+  <!-- la boîte suit la taille de la fenêtre ; le contenu défile dans le cadre, titre et croix restent en haut -->
   <dialog ref="dlg" class="box" aria-labelledby="ab-title" @click="onClick">
+    <div class="frame">
     <header>
       <h2 id="ab-title">About SC Companion</h2>
       <button type="button" class="x" aria-label="Close" @click="dlg?.close()">✕</button>
@@ -84,6 +86,7 @@ const LIBS = [
       </li>
       <li>Provided “as is”, without warranty of any kind.</li>
     </ul>
+    </div>
   </dialog>
 </template>
 
@@ -94,25 +97,44 @@ button:focus-visible {
   outline-offset: 1px;
 }
 
+// boîte transparente à la taille de la fenêtre (jamais plus haute que l'écran)
 .box {
   width: min(560px, calc(100vw - 32px));
+  max-width: none;
   max-height: calc(100vh - 32px);
-  padding: 14px 18px 18px;
-  border: 1px solid var(--cyan-dim);
-  @include bevel-edges-bg(10px, var(--cyan-dim), var(--panel));
+  padding: 0;
+  border: 0;
+  background: none;
   color: var(--text);
-  @include bevel(10px);
+  overflow: visible;
 
   &::backdrop {
     background: rgb(0 0 0 / 65%);
   }
 }
 
+// cadre biseauté qui défile quand le contenu dépasse (barre fine du thème, styles/base.scss)
+.frame {
+  max-height: calc(100vh - 32px);
+  padding: 0 18px 18px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  border: 1px solid var(--cyan-dim);
+  @include bevel-edges-bg(10px, var(--cyan-dim), var(--panel));
+  @include bevel(10px);
+}
+
+// titre et croix collés en haut pendant le défilement
 header {
+  position: sticky;
+  top: 0;
+  z-index: 1;
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 8px;
+  margin: 0 -18px 8px;
+  padding: 14px 18px 8px;
+  background: var(--panel);
 }
 
 h2 {

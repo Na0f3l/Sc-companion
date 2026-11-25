@@ -23,9 +23,15 @@ import { shipName } from './ships'
 
 // Toujours connecté au service (sans service, simples tentatives de reconnexion). ?demo dans l'adresse ouvre la
 // démo d'emblée (lien à partager, page hébergée sans service) ; elle se ferme seule si le jeu est en partie.
+// ?sessions / ?mobile : ouvre ce panneau d'emblée (menu de l'icône de la zone de notification) ; le paramètre est
+// ensuite retiré de l'adresse, pour qu'un rafraîchissement ne rouvre pas le panneau.
 onMounted(() => {
   connect()
-  if (new URLSearchParams(location.search).has('demo')) showDemo('ship')
+  const q = new URLSearchParams(location.search)
+  if (q.has('demo')) showDemo('ship')
+  if (q.has('sessions')) openSessions()
+  if (q.has('mobile')) void mobile.value?.open()
+  if (q.has('sessions') || q.has('mobile')) history.replaceState(null, '', location.pathname)
 })
 
 // Teinte globale : un attribut sur <html>, les variables CSS font le reste

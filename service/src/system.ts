@@ -45,11 +45,13 @@ const ntQuery = ntdll.func('int __stdcall NtQuerySystemInformation(int cls, _Out
 //   \GPU Adapter Memory(*)\Dedicated Usage : VRAM utilisée (octets) par carte
 interface Gpu {
   sample(): { util: number; vramBytes: number } | null
+  close(): void // ferme la requête et décharge pdh.dll (~23 Mo rendus)
 }
 function loadGpu(): Gpu | null {
   try {
     const pdh = koffi.load('pdh.dll')
     const open = pdh.func('uint32 __stdcall PdhOpenQueryW(void *src, uintptr_t user, _Out_ void **q)')
+    const close = pdh.func('uint32 __stdcall PdhCloseQuery(void *q)')
     const add = pdh.func('uint32 __stdcall PdhAddEnglishCounterW(void *q, str16 path, uintptr_t user, _Out_ void **c)')
     const collect = pdh.func('uint32 __stdcall PdhCollectQueryData(void *q)')
     const getArray = pdh.func('uint32 __stdcall PdhGetFormattedCounterArrayW(void *c, uint32 fmt, _Inout_ uint32 *size, _Out_ uint32 *count, void *items)')
@@ -102,6 +104,14 @@ function loadGpu(): Gpu | null {
         let vramBytes = 0
         if (vram[0]) each(vram[0], (_, v) => { vramBytes = Math.max(vramBytes, v) })
         return { util: Math.min(100, util), vramBytes }
+      },
+      close() {
+        try {
+          close(q[0])
+        } catch {
+          /* déjà fermée */
+        }
+        pdh.unload()
       },
     }
   } catch {
@@ -174,7 +184,9 @@ export interface Sample {
 }
 
 export function createSystemMonitor(onSample?: (s: Sample) => void) {
-  const gpu = loadGpu()
+  // Mesure GPU : seulement quand un écran l'affiche (setGpu, index.ts) ; les compteurs de performance Windows
+  // coûtent ~23 Mo, inutiles pour enregistrer une session sans écran
+  let gpu: Gpu | null = null
   let timer: NodeJS.Timeout | null = null
   let out: Flat = {}
 
@@ -273,7 +285,14 @@ export function createSystemMonitor(onSample?: (s: Sample) => void) {
   }
 
   return {
-    gpu: gpu !== null,
+    /** Mesure GPU allumée (un écran est connecté) ou éteinte (mémoire rendue). */
+    setGpu(on: boolean): void {
+      if (on && !gpu) gpu = loadGpu()
+      else if (!on && gpu) {
+        gpu.close()
+        gpu = null
+      }
+    },
     start() {
       if (timer) return
       sample()
