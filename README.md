@@ -15,7 +15,7 @@ Compagnon Star Citizen : infos en jeu en temps réel (perso, vaisseau, alertes) 
 
 Prérequis : Node 24, et la télémétrie activée côté jeu (LIVE 4.10 : variable d'environnement `GRPC_CLIENT_SERVER_ENABLED=true` avant de lancer le RSI Launcher).
 
-Le schéma `.proto` vient du projet communautaire [Sokren/sc-telemetry-deck](https://github.com/Sokren/sc-telemetry-deck) (`schema/sc_extrait.proto`). Il n'a pas de licence, donc il n'est pas inclus : le récupérer et le placer dans `telemetrie/proto/sc_telemetry.proto`.
+Le schéma de télémétrie n'est pas inclus et n'est pas à télécharger : le service le lit directement dans le jeu installé (`Bin64\StarCitizen.exe` embarque ses descripteurs protobuf), une fois par version du jeu, et le garde en cache dans `%LOCALAPPDATA%\SC Companion`. Il correspond donc toujours à la version installée. Repli possible : un fichier `telemetrie/proto/sc_telemetry.proto` (par ex. celui du projet communautaire [Sokren/sc-telemetry-deck](https://github.com/Sokren/sc-telemetry-deck)), utilisé seulement si l'exe est illisible.
 
 ```
 cd interface && npm install && npm run build   # une fois (et après chaque modification de l'interface)

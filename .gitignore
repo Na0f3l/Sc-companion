@@ -7,7 +7,7 @@ memoire/app/erreurs.log
 # Captures de télémétrie (solde aUEC, identifiants de vaisseau…)
 telemetrie/captures/
 
-# --- Schéma tiers sans licence (Sokren/sc-telemetry-deck) : à récupérer soi-même, voir README ---
+# --- Schéma de repli facultatif (tiers, sans licence) : le service lit le schéma dans StarCitizen.exe, voir README ---
 telemetrie/proto/*.proto
 
 # --- Générés ---

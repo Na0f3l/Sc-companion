@@ -4,7 +4,7 @@ import type { Source } from './source.ts'
 
 type Live = Source & { status(): string }
 
-export function createLazyLiveSource(addr?: string): Live {
+export function createLazyLiveSource(gameDir: () => string, addr?: string): Live {
   let real: Live | null = null
   let loading = false
   let wanted = false // start() demandé pendant le chargement
@@ -17,7 +17,7 @@ export function createLazyLiveSource(addr?: string): Live {
       loading = true
       import('./live.ts')
         .then((m) => {
-          real = m.createLiveSource(addr)
+          real = m.createLiveSource(gameDir(), addr)
           if (wanted) real.start()
         })
         .catch((e: Error) => console.error('Live telemetry unavailable:', e.message))

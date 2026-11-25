@@ -16,7 +16,7 @@ function onClick(e: MouseEvent): void {
 const REPO = 'https://github.com/Na0f3l/Sc-companion'
 
 const CREDITS = [
-  { what: 'Telemetry schema', who: 'Sokren — sc-telemetry-deck', url: 'https://github.com/Sokren/sc-telemetry-deck', note: 'community reconstruction of the game\'s telemetry interface' },
+  { what: 'Telemetry schema', who: 'Sokren — sc-telemetry-deck', url: 'https://github.com/Sokren/sc-telemetry-deck', note: 'pioneering work on the game\'s telemetry interface (the schema itself is read from your game install)' },
   { what: 'Ship data', who: 'Star Citizen Wiki API', url: 'https://api.star-citizen.wiki', note: 'names, speeds, rotation rates, fuel' },
   { what: 'Ship accelerations', who: 'SPViewer', url: 'https://www.spviewer.eu', note: 'community-measured G values' },
   { what: 'Critical alert sound', who: 'Lyubomir Ikonomov — Freesound', url: 'https://freesound.org/s/787777/', note: '“warning”' },

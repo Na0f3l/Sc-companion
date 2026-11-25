@@ -4,18 +4,15 @@
 //   en OCTETS BRUTS et on ne la décode qu'au moment où elle est lue (≈ 70 % de décodage en moins).
 // - Si le jeu n'est pas lancé ou que le flux coupe : nouvelle tentative toutes les 5 s,
 //   uniquement tant qu'un écran est connecté.
-import path from 'node:path'
-import { fileURLToPath } from 'node:url'
 import grpc from '@grpc/grpc-js'
-import protoLoader from '@grpc/proto-loader'
+import { loadTelemetryDefinition } from './schema.ts'
 import type { Source } from './source.ts'
 
-const PROTO = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../../telemetrie/proto/sc_telemetry.proto')
 const SERVICE = 'sc.game.telemetry.v1.GameTelemetryService'
 const RETRY_MS = 5000
 
-export function createLiveSource(addr = '127.0.0.1:2942'): Source & { status(): string } {
-  const def = protoLoader.loadSync(PROTO, { keepCase: true, enums: String, longs: String, defaults: false })
+export function createLiveSource(gameDir: string, addr = '127.0.0.1:2942'): Source & { status(): string } {
+  const def = loadTelemetryDefinition(gameDir) // schéma lu dans StarCitizen.exe (voir schema.ts)
   // Décodeur fourni par le schéma (octets → objet), utilisé seulement à la lecture
   const stream = (def[SERVICE] as grpc.ServiceDefinition).TelemetryStream
   const decode = stream.responseDeserialize as (b: Buffer) => unknown

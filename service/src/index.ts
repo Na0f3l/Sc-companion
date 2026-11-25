@@ -41,7 +41,7 @@ const TICK_MS = 200 // 5 envois par seconde au maximum
 
 // Par défaut : le jeu en direct. --replay <fichier|dossier> pour rejouer des captures.
 const replay = opt('replay')
-const source: Source = replay ? createReplaySource(replay) : createLazyLiveSource(opt('addr'))
+const source: Source = replay ? createReplaySource(replay) : createLazyLiveSource(() => gameDir(opt('game-dir')), opt('addr'))
 // Mesures et lecture du Game.log : en permanence (une mesure / 2 s), écran ouvert ou non, pour enregistrer
 // les sessions de jeu. La télémétrie du jeu (source) est ouverte tant que le jeu tourne (ou qu'un écran est
 // connecté) : sans écran, une seule trame décodée toutes les 2 s (siège, solde) ; la diffusion attend un écran.
