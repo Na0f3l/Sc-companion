@@ -54,9 +54,11 @@ const BOOST_ZONES: Zone[] = [
   { to: 0.25, color: '#ff5b4f' },
   { to: 1, color: '#63e4dd' },
 ]
-// Proche d'une planète : dans l'atmosphère (densité > 0) ou sol à portée du radar.
-// Hors de là, cap / altitude / vitesse verticale n'ont pas de sens (le HUD du jeu les masque aussi).
-const nearPlanet = computed(() => num(`${FLI}atmospheric_density`) > 0 || alt.value !== null)
+// Proche d'une planète : le jeu donne une altitude, ou le sol est à portée du radar. Dans l'espace, l'altitude
+// vaut « pas de mesure » ; la densité de l'atmosphère, elle, n'y est pas nulle (0,01 relevé le 2026-11-25) :
+// elle ne compte qu'au-delà d'un vrai seuil. Hors de là, cap / altitude / vitesse verticale n'ont pas de sens
+// (le HUD du jeu les masque aussi).
+const nearPlanet = computed(() => seaAlt.value !== null || alt.value !== null || num(`${FLI}atmospheric_density`) >= 0.05)
 const gMax = computed(() => num(`${FLI}g_meter.max`, 1) || 1)
 const gCur = computed(() => num(`${FLI}g_meter.current`))
 

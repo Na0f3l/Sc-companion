@@ -6,8 +6,14 @@
 // HTTP  GET /        → interface compilée (interface/dist), à ouvrir sur PC ou téléphone
 //       GET /health  → état du service et sa mémoire (pour surveiller l'empreinte)
 //       GET /lan     → adresses du PC sur le réseau local (QR code « Mobile connect » de l'interface)
+//       GET /history → mémoire de SC sur les 2 dernières heures (courbe zoomable de la bande RAM)
+//       GET /sessions            → sessions de jeu enregistrées (résumés, la plus récente d'abord)
+//       GET /sessions/<id>       → une session complète (mesures + événements)
+//       POST /sessions/<id>/save | /unsave  → la garder indéfiniment ou la rendre à la rotation (5 gardées)
+//       DELETE /sessions/<id>    → la supprimer (pas celle en cours)
 //       /data/…      → données des vaisseaux et leur mise à jour (shipdata.ts)
 // WS    /ws          → { type: 'snapshot', data } à la connexion, puis { type: 'patch', set, del } à 5 Hz max
+//                    ← { type: 'config', leakRate?, leakDuration? } : réglages communs (config.ts), renvoyés en cfg.*
 import http from 'node:http'
 import os from 'node:os'
 import { WebSocketServer, type WebSocket } from 'ws'
@@ -17,6 +23,8 @@ import { createLiveSource } from './sources/live.ts'
 import type { Source } from './sources/source.ts'
 import { createSystemMonitor } from './system.ts'
 import { createGameLogReader } from './gamelog.ts'
+import { configFlat, updateConfig } from './config.ts'
+import { createSessionRecorder } from './sessions.ts'
 import { hasInterface, serveStatic } from './static.ts'
 import { checkLatest, serveData } from './shipdata.ts'
 
@@ -32,14 +40,49 @@ const TICK_MS = 200 // 5 envois par seconde au maximum
 // Par défaut : le jeu en direct. --replay <fichier|dossier> pour rejouer des captures.
 const replay = opt('replay')
 const source: Source = replay ? createReplaySource(replay) : createLiveSource(opt('addr'))
-const system = createSystemMonitor() // mémoire SC / système, CPU, GPU, détection de fuite
-const gameLog = createGameLogReader(opt('game-dir')) // mode de jeu (PU / Arena Commander) d'après le Game.log
+// Mesures et lecture du Game.log : en permanence (une mesure / 2 s), écran ouvert ou non, pour enregistrer
+// les sessions de jeu. La télémétrie du jeu (source) est ouverte tant que le jeu tourne (ou qu'un écran est
+// connecté) : sans écran, une seule trame décodée toutes les 2 s (siège, solde) ; la diffusion attend un écran.
+const sessions = createSessionRecorder()
+let gameRunning = false
+const system = createSystemMonitor((s) => {
+  sessions.onSample(s)
+  gameRunning = s.scMb !== null
+  if (replay) return // captures rejouées : seulement avec un écran, comme avant
+  if (gameRunning) source.start()
+  else if (!clients.size) source.stop()
+  if (!timer) { // pas d'écran : le diffuseur ne lit pas la télémétrie, on le fait ici
+    const frame = source.latest()
+    if (frame) observe(flatten(frame))
+  }
+}) // mémoire SC / système, CPU, GPU, fuite
+const gameLog = createGameLogReader(opt('game-dir'), (e) => sessions.onEvent(e)) // mode de jeu, blessures, événements
 
 // ---- Diffusion ------------------------------------------------------------------
 let state: Flat = {} // dernier état envoyé aux écrans
 let lastFrame: unknown = null // dernière trame du jeu traitée…
 let frameFlat: Flat = {} // …et sa version à plat
 let timer: NodeJS.Timeout | null = null
+let seat: { on: boolean; cls: string } | null = null // aux commandes ? (null = pas encore de télémétrie)
+let balance: number | null = null // solde aUEC (télémétrie)
+
+// Télémétrie → siège du vaisseau (le Game.log ne note que la sortie), solde (argent gagné / dépensé de la
+// session) et vie (coma / ranimé, gamelog.ts). Appelé avec une trame reçue : sans trame, on ne conclut rien.
+function observe(fl: Flat): void {
+  // le jeu n'envoie pas les valeurs nulles : vie absente mais maximum présent = vie à 0 (coma)
+  const hp = fl['actor.vitals.health.current'] ?? (fl['actor.vitals.health.max'] !== undefined ? 0 : undefined)
+  if (typeof hp === 'number') gameLog.setHealth(hp)
+  const loco = fl['actor.state.locomotion']
+  const cls = fl['vehicle.state.class_name']
+  const seated = typeof loco === 'string' && loco.endsWith('SEATED') && typeof cls === 'string' && cls !== ''
+  if (seat && seated !== seat.on) gameLog.seatEvent(seated, seated ? (cls as string) : seat.cls)
+  seat = { on: seated, cls: seated ? (cls as string) : (seat?.cls ?? '') }
+  const uec = Number(fl['actor.state.uec_balance'])
+  if (fl['actor.state.uec_balance'] !== undefined && Number.isFinite(uec) && uec !== balance) {
+    balance = uec
+    sessions.onBalance(Date.now(), uec)
+  }
+}
 const clients = new Set<WebSocket>()
 
 function tick(): void {
@@ -53,7 +96,9 @@ function tick(): void {
   // quand la santé max revient à 100, on considère que tout est soigné.
   const healthMax = frameFlat['actor.vitals.health.max']
   if (typeof healthMax === 'number' && healthMax >= 99.9) gameLog.clearInjuries()
-  const next = { ...frameFlat, ...system.flat(), ...gameLog.flat() }
+  if (frame) observe(frameFlat)
+  const live = sessions.current()
+  const next = { ...frameFlat, ...system.flat(), ...gameLog.flat(), ...configFlat(), ...(live ? { 'session.live': live } : {}) }
   const patch = diff(state, next)
   state = next
   if (!patch) return
@@ -63,8 +108,6 @@ function tick(): void {
 
 function onFirstClient(): void {
   source.start()
-  system.start()
-  gameLog.start()
   tick()
   timer = setInterval(tick, TICK_MS)
   console.log('Client connected: broadcasting started')
@@ -73,12 +116,15 @@ function onFirstClient(): void {
 function onLastClientGone(): void {
   if (timer) clearInterval(timer)
   timer = null
-  source.stop()
-  system.stop()
-  gameLog.stop()
+  if (!gameRunning || replay) source.stop() // jeu lancé : la télémétrie reste ouverte (siège, solde)
   state = {}
   console.log('No clients left: broadcasting paused')
 }
+
+// Démarrage des mesures (après les déclarations ci-dessus, qu'utilise la première mesure) ; le système d'abord :
+// la session doit être ouverte avant que le Game.log n'envoie ses événements
+system.start()
+gameLog.start()
 
 // ---- Serveurs -------------------------------------------------------------------
 // Adresses IPv4 du PC joignables depuis le téléphone : réseau privé d'abord (192.168 puis 10 puis 172.16-31,
@@ -92,6 +138,29 @@ function lanUrls(): string[] {
     .map((a) => a!.address)
     .sort((a, b) => rank(a) - rank(b))
     .map((ip) => `http://${ip}:${PORT}`)
+}
+
+// ---- Sessions (HTTP) -------------------------------------------------------------
+function json(res: http.ServerResponse, code: number, body: unknown): void {
+  res.writeHead(code, { 'content-type': 'application/json', 'cache-control': 'no-store' })
+  res.end(JSON.stringify(body))
+}
+
+function serveSessions(req: http.IncomingMessage, res: http.ServerResponse): boolean {
+  const m = req.url?.match(/^\/sessions(?:\/([\w-]+)(?:\/(save|unsave))?)?\/?$/)
+  if (!m) return false
+  const [, id, action] = m
+  if (!id && req.method === 'GET') json(res, 200, sessions.list())
+  else if (id && !action && req.method === 'GET') {
+    const data = sessions.get(id)
+    if (data) json(res, 200, data)
+    else json(res, 404, { error: 'not found' })
+  } else if (id && action && req.method === 'POST') json(res, sessions.setSaved(id, action === 'save') ? 200 : 404, {})
+  else if (id && !action && req.method === 'DELETE') {
+    const r = sessions.remove(id)
+    json(res, r === 'ok' ? 200 : r === 'live' ? 409 : 404, { result: r })
+  } else json(res, 405, { error: 'method not allowed' })
+  return true
 }
 
 const server = http.createServer((req, res) => {
@@ -108,6 +177,12 @@ const server = http.createServer((req, res) => {
     }))
     return
   }
+  if (req.url === '/history') {
+    res.writeHead(200, { 'content-type': 'application/json', 'cache-control': 'no-store' })
+    res.end(JSON.stringify(system.history()))
+    return
+  }
+  if (serveSessions(req, res)) return
   if (req.url === '/lan') {
     res.writeHead(200, { 'content-type': 'application/json', 'cache-control': 'no-store' })
     res.end(JSON.stringify({ port: PORT, urls: lanUrls() }))
@@ -124,11 +199,27 @@ wss.on('connection', (ws) => {
   clients.add(ws)
   if (clients.size === 1) onFirstClient()
   ws.send(JSON.stringify({ type: 'snapshot', source: source.name, data: state }))
+  ws.on('message', (raw) => {
+    try {
+      const msg = JSON.parse(String(raw)) as { type?: string }
+      if (msg.type === 'config') updateConfig(msg as Record<string, unknown>) // diffusé à tous au tick suivant
+    } catch {
+      /* message illisible : ignoré */
+    }
+  })
   ws.on('close', () => {
     clients.delete(ws)
     if (clients.size === 0) onLastClientGone()
   })
 })
+
+// Ctrl+C / fermeture : écrire les mesures en attente (la session reste ouverte, reprise au prochain démarrage)
+for (const sig of ['SIGINT', 'SIGTERM', 'SIGBREAK'] as const) {
+  process.on(sig, () => {
+    sessions.flush()
+    process.exit(0)
+  })
+}
 
 server.listen(PORT, () => {
   void checkLatest() // nouvelle version du jeu sur le wiki ? (un appel, en arrière-plan)

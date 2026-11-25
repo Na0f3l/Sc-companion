@@ -81,8 +81,9 @@ interface Part {
 // Ordre = ordre de dessin (le torse d'abord, les membres par-dessus)
 const PARTS: Part[] = [
   { key: 'torso', label: 'Torso', skin: TORSO_SKIN, bones: TORSO_BONES, line: [70, 52, 90, 30], tx: 96, ty: 26 },
-  { key: 'right_arm', label: 'Right arm', skin: ARM_SKIN, bones: ARM_BONES, line: [-7, 131, -13, 142], tx: -16, ty: 150 },
-  { key: 'left_arm', label: 'Left arm', skin: mirror(ARM_SKIN), bones: mirror(ARM_BONES), line: [127, 131, 133, 142], tx: 136, ty: 150 },
+  // bras : trait horizontal depuis le milieu du bras (le coude, ~(19, 84) une fois le bras écarté de 12°)
+  { key: 'right_arm', label: 'Right arm', skin: ARM_SKIN, bones: ARM_BONES, line: [19, 84, -1, 84], tx: -7, ty: 84 },
+  { key: 'left_arm', label: 'Left arm', skin: mirror(ARM_SKIN), bones: mirror(ARM_BONES), line: [101, 84, 121, 84], tx: 127, ty: 84 },
   { key: 'right_leg', label: 'Right leg', skin: LEG_SKIN, bones: LEG_BONES, line: [36, 191, 18, 191], tx: 11, ty: 191 },
   { key: 'left_leg', label: 'Left leg', skin: mirror(LEG_SKIN), bones: mirror(LEG_BONES), line: [84, 191, 102, 191], tx: 109, ty: 191 },
   { key: 'head', label: 'Head', skin: HEAD_SKIN, bones: HEAD_BONES, line: [49, 16, 30, 16], tx: 24, ty: 16 },

@@ -10,15 +10,16 @@
 // Une mesure toutes les 2 s, uniquement quand un écran est connecté. Historique borné à 120 s.
 import koffi from 'koffi'
 import { flatten, type Flat } from './flat.ts'
+import { config } from './config.ts'
 
 // ---- Réglages (repris de memoire/app/reglages.json) ----------------------------------
-const LEAK_RATE = 100 // Mo/s : pente 15 s au-delà de laquelle la mémoire de SC « fuit »
-// Durée exigée au-dessus du seuil. L'outil PowerShell utilise 15 s + 30 s pendant les chargements
-// (détectés dans le Game.log). Sans le Game.log ici, on exige directement 45 s :
+// Seuil et durée de la fuite : réglables depuis les écrans (config.ts ; par défaut 100 Mo/s pendant 45 s).
+// Pente 15 s au-delà du seuil pendant toute la durée = fuite. L'outil PowerShell utilise 15 s + 30 s pendant
+// les chargements (détectés dans le Game.log) ; ici on exige directement 45 s par défaut :
 // un chargement (150 à 300 Mo/s pendant 15 à 45 s) ne déclenche pas d'alerte.
-const LEAK_DURATION = 45 // s
 const CALM_AFTER = 60 // s de calme (pente 30 s < seuil / 3) pour clore un épisode
 const STARTUP = 180 // s : pas de détection pendant le chargement initial du jeu
+const LONG_POINTS = 3600 // historique long : 2 h à une mesure toutes les 2 s
 const SAMPLE_MS = 2000 // comme l'outil PowerShell : assez pour la pente 15 s et la variation sur 5 s
 const SC_EXE = 'starcitizen.exe'
 
@@ -155,7 +156,16 @@ function slope(buf: Pt[], win: number): number | null {
 // ---- Moniteur -----------------------------------------------------------------------
 export type LeakState = 'startup' | 'stable' | 'rising' | 'leak' | 'recovering'
 
-export function createSystemMonitor() {
+/** Une mesure (toutes les 2 s) : temps en s, mémoire de SC en Mo (null = jeu fermé), engagement système en %. */
+export interface Sample {
+  t: number
+  scMb: number | null
+  scStartedAt: number | null // ms : lancement du processus StarCitizen.exe
+  commitPct: number | null
+  leak: LeakState | null
+}
+
+export function createSystemMonitor(onSample?: (s: Sample) => void) {
   const gpu = loadGpu()
   let timer: NodeJS.Timeout | null = null
   let out: Flat = {}
@@ -163,6 +173,10 @@ export function createSystemMonitor() {
   // état entre deux mesures
   let prevCpu: number[] | null = null
   const hist: Pt[] = [] // mémoire de SC, 120 s max
+  // Historique long pour la courbe zoomable de l'interface (GET /history) : 2 h à une mesure / 2 s = 3 600 points
+  // au plus (~60 Ko). Temps en s, mémoire en Mo arrondie. Pas de mesure = jeu fermé (trou dans la courbe).
+  const longT: number[] = []
+  const longMb: number[] = []
   let hotSince: number | null = null
   let leak: { onsetMb: number; calmSince: number | null } | null = null
   let scCreated = 0
@@ -209,20 +223,23 @@ export function createSystemMonitor() {
       if (sc.created !== scCreated) { hist.length = 0; hotSince = null; leak = null; scCreated = sc.created } // jeu (re)lancé
       const mb = sc.privateBytes / 2 ** 20
       hist.push({ t: now, mb })
+      longT.push(Math.round(now))
+      longMb.push(Math.round(mb))
+      if (longT.length > LONG_POINTS + 300) { longT.splice(0, 300); longMb.splice(0, 300) } // par paquets : pas de décalage à chaque mesure
       while (hist.length && now - hist[0].t > 120) hist.shift()
 
       const s15 = slope(hist, 15)
       const s30 = slope(hist, 30)
       const startup = Date.now() - fileTimeToMs(sc.created) < STARTUP * 1000
-      const hot = s15 !== null && s15 >= LEAK_RATE
+      const hot = s15 !== null && s15 >= config.leakRate
       hotSince = hot && !startup ? (hotSince ?? now) : null
 
       if (leak) {
-        const calm = s30 !== null && s30 < LEAK_RATE / 3
+        const calm = s30 !== null && s30 < config.leakRate / 3
         if (!calm) leak.calmSince = null
         else if (leak.calmSince === null) leak.calmSince = now
         else if (now - leak.calmSince >= CALM_AFTER) leak = null // fin de l'épisode
-      } else if (hotSince !== null && now - hotSince >= LEAK_DURATION) {
+      } else if (hotSince !== null && now - hotSince >= config.leakDuration) {
         leak = { onsetMb: hist.find((h) => h.t >= hotSince!)?.mb ?? mb, calmSince: null }
       }
 
@@ -238,6 +255,13 @@ export function createSystemMonitor() {
       if (leak) f['sc.leak_growth_mb'] = mb - leak.onsetMb
     }
     out = flatten(f) // arrondi une fois par mesure (et non à chaque envoi)
+    onSample?.({
+      t: now,
+      scMb: typeof f['sc.private_mb'] === 'number' ? f['sc.private_mb'] : null,
+      scStartedAt: sc ? fileTimeToMs(sc.created) : null,
+      commitPct: typeof f['sys.commit_pct'] === 'number' ? f['sys.commit_pct'] : null,
+      leak: typeof f['sc.leak'] === 'string' ? (f['sc.leak'] as LeakState) : null,
+    })
   }
 
   return {
@@ -254,5 +278,7 @@ export function createSystemMonitor() {
       prevCpu = null
     },
     flat: (): Flat => out,
+    /** Mémoire de SC sur les 2 dernières heures : { t: [s…], mb: [Mo…] } */
+    history: () => ({ t: longT.slice(-LONG_POINTS), mb: longMb.slice(-LONG_POINTS) }),
   }
 }

@@ -103,9 +103,12 @@ function trackBraking(): void {
   if (!prevSink || dt > 0.05) prevSink = { v, t }
   braking = decel > 0.3 * brakeAccel()
 }
+// Dans l'atmosphère : la densité n'est pas nulle dans l'espace (0,01 relevé le 2026-11-25), d'où un vrai seuil
+const inAtmosphere = () => num(`${FLI}atmospheric_density`) >= 0.05
+
 function track(): void {
   trackBraking()
-  if (num(`${FLI}atmospheric_density`) <= 0) groundAlt = null
+  if (!inAtmosphere()) groundAlt = null
   const h = radarHeight()
   if (h !== null && has(`${FLI}altitude`)) groundAlt = num(`${FLI}altitude`) - h
   const t = performance.now()
@@ -138,7 +141,7 @@ function crashLevel(): () => CrashLevel {
     let next: CrashLevel = null
     if (sink > minSink) {
       if (h !== null) next = need > h ? 'crash' : null
-      else if (num(`${FLI}atmospheric_density`) > 0 && (groundAlt !== null || profile().blindSink)) {
+      else if (inAtmosphere() && (groundAlt !== null || profile().blindSink)) {
         const ground = groundAlt !== null ? groundAlt + profile().terrainMargin : profile().terrainMax
         const room = Math.max(num(`${FLI}altitude`) - ground, RADAR_RANGE)
         next = need > room ? 'sink' : null

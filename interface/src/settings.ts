@@ -35,15 +35,34 @@ interface Settings {
   components: Record<ComponentKey, boolean>
   keepAwake: boolean // garder l'écran allumé (wakelock.ts)
   acePilot: boolean // alertes de vol bien plus tolérantes à la prise de risque (crash.ts, alerts.ts)
+  ram: RamSettings // seuils des alertes mémoire (panneau de la bande RAM, MemoryBar.vue)
+  migrations: string[] // changements de valeur par défaut déjà appliqués à ces réglages (voir load)
 }
+
+/** Seuils des alertes mémoire. Engagement système en % de la limite ; jeu en Go (0 = pas d'alerte). */
+export interface RamSettings {
+  warnPct: number
+  critPct: number
+  gameGb: number
+}
+export const RAM_DEFAULTS: RamSettings = { warnPct: 65, critPct: 75, gameGb: 0 }
 
 const DEFAULTS: Settings = {
   alerts: Object.fromEntries(ALERT_GROUPS.map((g) => [g.key, true])) as Record<AlertGroup, boolean>,
   sound: Object.fromEntries(ALERT_GROUPS.map((g) => [g.key, true])) as Record<AlertGroup, boolean>,
-  components: Object.fromEntries(COMPONENT_ALERTS.map((c) => [c.key, true])) as Record<ComponentKey, boolean>,
+  // propulseurs décochés : le jeu les signale « endommagés » à chaque saut quantique (bug du jeu, 2026-11-25)
+  components: Object.fromEntries(COMPONENT_ALERTS.map((c) => [c.key, c.key !== 'thr'])) as Record<ComponentKey, boolean>,
   // activé d'office sur écran tactile (téléphone, tablette) ; sur PC l'écran sert déjà au jeu
   keepAwake: window.matchMedia('(pointer: coarse)').matches,
   acePilot: false,
+  ram: { ...RAM_DEFAULTS },
+  migrations: [],
+}
+
+// Nouvelles valeurs par défaut à appliquer UNE fois aux réglages déjà enregistrés (l'utilisateur peut ensuite
+// les changer à nouveau) : sans ça, un réglage déjà mémorisé garde son ancienne valeur.
+const MIGRATIONS: Record<string, (s: Settings) => void> = {
+  'thr-off': (s) => (s.components.thr = false), // propulseurs : faux « endommagés » en saut quantique
 }
 
 const KEY = 'sc-companion.settings'
@@ -51,14 +70,23 @@ const KEY = 'sc-companion.settings'
 // Fusion avec les valeurs par défaut : un réglage ajouté plus tard prend sa valeur par défaut
 function load(): Settings {
   try {
-    const saved = JSON.parse(localStorage.getItem(KEY) ?? '{}') as Partial<Settings>
-    return {
+    const raw = localStorage.getItem(KEY)
+    const saved = JSON.parse(raw ?? '{}') as Partial<Settings>
+    const s: Settings = {
       ...DEFAULTS,
       ...saved,
       alerts: { ...DEFAULTS.alerts, ...saved.alerts },
       sound: { ...DEFAULTS.sound, ...saved.sound },
       components: { ...DEFAULTS.components, ...saved.components },
+      ram: { ...DEFAULTS.ram, ...saved.ram },
+      migrations: [...(saved.migrations ?? [])],
     }
+    for (const [name, apply] of Object.entries(MIGRATIONS)) {
+      if (s.migrations.includes(name)) continue
+      if (raw) apply(s) // réglages neufs : les valeurs par défaut sont déjà les bonnes
+      s.migrations.push(name)
+    }
+    return s
   } catch {
     return structuredClone(DEFAULTS)
   }

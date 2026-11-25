@@ -1,13 +1,27 @@
 <script setup lang="ts">
 // Voile d'alerte plein écran : apparaît, le fond bat 3 fois en 1,5 s, puis disparaît seul.
 // Aucune interaction nécessaire (pointer-events: none : il ne bloque jamais l'écran).
+// Toujours au-dessus de tout, y compris des fenêtres (panneau Sessions, Mobile connect) : celles-ci s'ouvrent dans
+// la « couche supérieure » du navigateur, au-dessus de tout z-index. Chaque alerte y entre à son tour (popover
+// affiché à l'apparition) : la dernière entrée passe devant les fenêtres déjà ouvertes.
+import type { Directive } from 'vue'
 import { shownAlert } from '@/alerts'
+
+const vTop: Directive<HTMLElement> = {
+  mounted(el) {
+    try {
+      el.showPopover?.()
+    } catch {
+      /* navigateur sans popover : reste au-dessus du reste par son z-index */
+    }
+  },
+}
 </script>
 
 <template>
   <Transition name="alert">
     <!-- :key = l'id : une nouvelle alerte relance l'animation de clignotement -->
-    <div v-if="shownAlert" :key="shownAlert.id" class="overlay" :class="`is-${shownAlert.level}`" role="alert">
+    <div v-if="shownAlert" :key="shownAlert.id" v-top popover="manual" class="overlay" :class="`is-${shownAlert.level}`" role="alert">
       <div class="band" />
       <div class="box">
         <p class="title">{{ shownAlert.level === 'info' ? 'CLEAR' : 'ALERT!' }}</p>
@@ -25,12 +39,25 @@ import { shownAlert } from '@/alerts'
   position: fixed;
   inset: 0;
   z-index: 100;
+  // popover : on annule le style par défaut du navigateur (boîte centrée, bordure, fond)
+  width: auto;
+  height: auto;
+  max-width: none;
+  max-height: none;
+  margin: 0;
+  border: 0;
+  color: inherit;
+  overflow: visible;
   display: grid;
   grid-template-rows: auto 1fr auto;
   padding: env(safe-area-inset-top, 0) env(safe-area-inset-right, 0) env(safe-area-inset-bottom, 0) env(safe-area-inset-left, 0);
   background: rgb(0 0 0 / 55%);
   box-shadow: inset 0 0 0 3px var(--a);
   pointer-events: none;
+
+  &::backdrop {
+    display: none;
+  }
 
   &.is-info {
     --a: var(--green);

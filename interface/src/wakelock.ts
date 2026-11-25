@@ -40,8 +40,13 @@ function makeVideo(): HTMLVideoElement {
   return v
 }
 
+// téléphone / tablette seulement : sur PC le réglage n'est pas proposé (l'écran sert déjà au jeu), et un ancien
+// réglage coché ne doit pas y rester actif sans qu'on puisse le décocher
+const touch = window.matchMedia('(pointer: coarse)').matches
+const wanted = () => touch && settings.keepAwake
+
 async function acquire(): Promise<void> {
-  if (!settings.keepAwake || document.visibilityState !== 'visible') return
+  if (!wanted() || document.visibilityState !== 'visible') return
   if (sentinel || (video && !video.paused)) return // déjà actif
   if (canApi) {
     try {
@@ -72,7 +77,7 @@ function release(): void {
   awake.value = 'off'
 }
 
-watch(() => settings.keepAwake, (on) => (on ? void acquire() : release()), { immediate: true })
+watch(wanted, (on) => (on ? void acquire() : release()), { immediate: true })
 document.addEventListener('visibilitychange', () => void acquire())
 window.addEventListener('pointerdown', () => void acquire(), { passive: true })
 

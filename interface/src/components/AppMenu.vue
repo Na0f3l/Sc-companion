@@ -1,24 +1,19 @@
 <script setup lang="ts">
-// Menu de l'en-tête : Ace pilot et affichage en tête, puis alertes (activables une par une) et tests, dépliables.
+// Menu de l'en-tête : Ace pilot et affichage en tête, puis alertes (activables
+// une par une) et tests, dépliables.
 // Les réglages sont mémorisés dans le navigateur (settings.ts). D'autres sections viendront (seuils RAM…).
 // Se ferme avec Échap ou un clic à l'extérieur ; un clic dans le menu (case à cocher) le laisse ouvert.
 import { onBeforeUnmount, ref, watch } from 'vue'
 import { TESTS, type TestKind, shownAlert, triggerTest } from '@/alerts'
 import { flash } from '@/hit'
 import { ALERT_GROUPS, COMPONENT_ALERTS, settings } from '@/settings'
-import { awake, canFullscreen, fullscreen, toggleFullscreen } from '@/wakelock'
-import MobileConnect from './MobileConnect.vue'
+import { awake } from '@/wakelock'
 
 // méthode en cours (diagnostic : la vidéo de repli ne marche pas sur tous les téléphones)
 const AWAKE_NOTE = { system: 'Active · system lock', video: 'Active · video fallback', pending: 'Tap anywhere on the page to activate' }
 
 const open = ref(false)
-// fenêtre Mobile connect : hors du panneau (qui se ferme), ouverte par son entrée du menu
-const mobile = ref<InstanceType<typeof MobileConnect>>()
-function openMobile(): void {
-  open.value = false
-  void mobile.value?.open()
-}
+const touch = window.matchMedia('(pointer: coarse)').matches // téléphone, tablette
 const testsOpen = ref(false)
 const alertsOpen = ref(false)
 const root = ref<HTMLElement | null>(null)
@@ -81,19 +76,13 @@ function onComponent(): void {
           Ace pilot
         </label>
         <p class="note">{{ settings.acePilot ? 'Late flight warnings, risk-tolerant' : 'Early flight warnings' }}</p>
-        <label class="check">
+        <!-- garder l'écran allumé : téléphone / tablette seulement (sur PC, l'écran sert déjà au jeu) -->
+        <label v-if="touch" class="check">
           <input v-model="settings.keepAwake" type="checkbox" />
           <span class="box" aria-hidden="true" />
           Keep screen on
         </label>
-        <p v-if="awake !== 'off'" class="note" :class="awake">{{ AWAKE_NOTE[awake] }}</p>
-        <button v-if="canFullscreen" type="button" class="row" @click="toggleFullscreen">
-          <span>{{ fullscreen ? 'Exit full screen' : 'Full screen' }}</span>
-          <span aria-hidden="true">⛶</span>
-        </button>
-        <button v-if="mobile?.onPc" type="button" class="row" @click="openMobile">
-          <span>Mobile connect</span>
-        </button>
+        <p v-if="touch && awake !== 'off'" class="note" :class="awake">{{ AWAKE_NOTE[awake] }}</p>
       </section>
 
       <!-- Alertes : sous-liste dépliable, une case par groupe -->
@@ -175,7 +164,6 @@ function onComponent(): void {
         </div>
       </section>
     </div>
-    <MobileConnect ref="mobile" />
   </div>
 </template>
 

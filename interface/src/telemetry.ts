@@ -85,6 +85,16 @@ export function connect(): void {
   }
 }
 
+/**
+ * Change un réglage commun du service (service/src/config.ts), ex. { leakRate: 120 }. Appliqué tout de suite ici
+ * (clé cfg.* de l'état) pour que le champ réagisse sans attendre ; le service le renvoie ensuite à tous les écrans.
+ * En mode démo, seul l'affichage change.
+ */
+export function sendConfig(key: 'leakRate' | 'leakDuration', value: number): void {
+  tm[key === 'leakRate' ? 'cfg.leak_rate' : 'cfg.leak_duration'] = value
+  if (ws?.readyState === WebSocket.OPEN) ws.send(JSON.stringify({ type: 'config', [key]: value }))
+}
+
 // ---- Mode démo ----------------------------------------------------------------------
 // Voir les écrans sans le jeu (ni le service) : la connexion est coupée et l'état est figé
 // sur des valeurs d'exemple (demo.ts). Pas de simulation, juste les panneaux.

@@ -52,26 +52,36 @@ export function triggerTest(kind: TestKind): void {
 
 // Seuil bas avec hystérésis : vrai sous `on`, ne redevient faux qu'au-dessus de `off`.
 // Évite une alerte en boucle quand la valeur oscille autour du seuil.
-// Faux si le champ n'est pas reçu (jeu fermé, hors ligne) : une valeur absente n'est pas « 0 % ».
+// Faux si la jauge n'est pas reçue du tout (jeu fermé, hors ligne). Mais le jeu omet les valeurs nulles :
+// valeur absente avec son maximum présent = 0 %.
+// Ne s'allume qu'en DESCENDANT sous le seuil : une valeur qui remonte en restant dessous (ranimé après un coma,
+// on mange / boit un peu) ne déclenche rien. La dernière valeur connue est gardée même si le champ disparaît
+// un instant (chargement, réapparition).
 function lowVital(name: string, on = 0.25, off = 0.3): () => boolean {
   let low = false
+  let prev: number | null = null
   return () => {
     const k = `${ACT}vitals.${name}.current`
-    if (!has(k)) return (low = false)
+    // le jeu n'envoie pas les valeurs nulles : valeur absente mais maximum présent = 0 (ex. vie à 0 dans le coma)
+    if (!has(k) && !has(`${ACT}vitals.${name}.max`)) return (low = false)
     const ratio = num(k) / (num(`${ACT}vitals.${name}.max`, 100) || 100)
-    low = low ? ratio < off : ratio < on
+    const falling = prev === null || ratio < prev
+    low = low ? ratio < off : ratio < on && falling
+    prev = ratio
     return low
   }
 }
 
-// Seuil haut avec hystérésis : vrai au-dessus de `on`, ne redevient faux qu'en dessous de `off`.
-// Faux si la valeur n'est pas reçue.
-function above(key: string, on: number, off: number): () => boolean {
+// Seuil haut avec hystérésis : vrai au-dessus de on(), ne redevient faux qu'en dessous de on() − margin.
+// Seuil relu à chaque appel : un réglage modifié s'applique tout de suite. Faux si la valeur n'est pas reçue
+// ou si le seuil vaut 0 (alerte coupée). scale : conversion d'unité (Mo → Go).
+function above(key: string, on: () => number, margin: number, scale = 1): () => boolean {
   let high = false
   return () => {
-    if (!has(key)) return (high = false)
-    const v = num(key)
-    high = high ? v > off : v > on
+    const limit = on()
+    if (!has(key) || limit <= 0) return (high = false)
+    const v = num(key) * scale
+    high = high ? v > limit - margin : v > limit
     return high
   }
 }
@@ -84,13 +94,10 @@ function above(key: string, on: number, off: number): () => boolean {
  */
 const proximity = (minSpeed: number) =>
   annunciator('prox') === 'major' && !gearDown() && num(`${FLI}speed`) >= minSpeed
-// Seuils des alertes PROX (le voyant orange seul s'allume tout le temps près du sol : ignoré) :
-//  - PROX rouge entre 60 et 100 m/s : « Proximity warning » (orange) ; désactivée en Ace pilot ;
-//  - PROX rouge au-dessus de 100 m/s (200 en Ace pilot) : « Collision imminent » (rouge).
-// Un posé sportif mais maîtrisé (en station notamment) reste silencieux. Pendant une alerte crash, le sol
-// est déjà signalé : pas de doublon PROX.
+// PROX rouge (dès 60 m/s, train rentré) : « Collision imminent » (rouge), Ace pilot compris (choix de l'utilisateur,
+// 2026-11-25). Le voyant orange seul s'allume tout le temps près du sol : ignoré. Un posé (train sorti, moins de
+// 60 m/s, posé) reste silencieux. Pendant une alerte crash, le sol est déjà signalé : pas de doublon PROX.
 const OBSTACLE_MIN_SPEED = 60 // m/s
-const fast = () => num(`${FLI}speed`) > (settings.acePilot ? 200 : 100)
 const proxQuiet = () => bool(`${VEH}flight.state.is_landed`) || crash.value !== null
 
 // Niveaux :
@@ -101,23 +108,24 @@ const proxQuiet = () => bool(`${VEH}flight.state.is_landed`) || crash.value !== 
 const RULES: AlertRule[] = [
   // Crash au sol : distance d'arrêt du vaisseau contre hauteur au-dessus du sol (voir crash.ts)
   { id: 'crash', group: 'crash', level: 'critical', message: 'Crash imminent', active: () => crash.value === 'crash', repeatMs: 3000 },
-  { id: 'collision-fast', group: 'collision', level: 'critical', message: 'Collision imminent', active: () => proximity(OBSTACLE_MIN_SPEED) && fast() && !proxQuiet() },
+  { id: 'collision', group: 'collision', level: 'critical', message: 'Collision imminent', active: () => proximity(OBSTACLE_MIN_SPEED) && !proxQuiet() },
   { id: 'sink', group: 'crash', level: 'warning', message: 'Descent too fast', active: () => crash.value === 'sink', repeatMs: 6000 },
   { id: 'skim', group: 'crash', level: 'warning', message: 'Pull up', active: () => skim.value, repeatMs: 3000 },
-  { id: 'proximity', group: 'collision', level: 'warning', message: 'Proximity warning', active: () => !settings.acePilot && proximity(OBSTACLE_MIN_SPEED) && !fast() && !proxQuiet() },
   { id: 'health', group: 'health', level: 'critical', message: 'Critical health', active: lowVital('health') },
   { id: 'thirst', group: 'thirst', level: 'warning', message: 'Dehydrated', active: lowVital('thirst') },
   { id: 'hunger', group: 'hunger', level: 'warning', message: 'Starving', active: lowVital('hunger') },
   // voyant MISL en rouge : un missile est verrouillé sur le vaisseau
-  // Mémoire (mêmes seuils que l'outil PowerShell) : fuite détectée par le service, engagement système
+  // Mémoire : fuite détectée par le service ; engagement système et mémoire du jeu, seuils réglables dans le
+  // panneau de la bande RAM (par défaut ceux de l'outil PowerShell : 65 % / 75 %, alerte jeu coupée)
   { id: 'ram-leak', group: 'ramLeak', level: 'critical', message: 'RAM leak detected', active: () => str('sc.leak') === 'leak' },
-  { id: 'mem-crit', group: 'memory', level: 'critical', message: 'Memory critical', active: above('sys.commit_pct', 75, 72) },
-  { id: 'mem-high', group: 'memory', level: 'warning', message: 'Memory high', active: above('sys.commit_pct', 65, 62) },
+  { id: 'mem-crit', group: 'memory', level: 'critical', message: 'Memory critical', active: above('sys.commit_pct', () => settings.ram.critPct, 3) },
+  { id: 'mem-high', group: 'memory', level: 'warning', message: 'Memory high', active: above('sys.commit_pct', () => settings.ram.warnPct, 3) },
+  { id: 'game-ram', group: 'memory', level: 'warning', message: 'Game RAM high', active: above('sc.private_mb', () => settings.ram.gameGb, 0.5, 1 / 1024) },
   // Menaces, relevées en test réel (2026-11-24) : RADR orange ou rouge = verrouillé au radar (le rouge,
   // verrouillage plus menaçant, n'est PAS un radar endommagé) ; MISL rouge fixe = missile verrouillé ;
   // MISL rouge clignotant = missile lancé. Le RADR n'est donc jamais traité comme un dégât de composant.
-  { id: 'radar-lock-hard', group: 'radarLock', level: 'critical', message: 'Radar lock', active: () => annunciator('radr') === 'major' },
-  { id: 'radar-lock', group: 'radarLock', level: 'warning', message: 'Radar lock', active: () => annunciator('radr') === 'minor' },
+  // RADR orange ou rouge : toujours une alerte orange (choix de l'utilisateur : un verrouillage ne mérite pas le rouge)
+  { id: 'radar-lock', group: 'radarLock', level: 'warning', message: 'Radar lock', active: () => annunciator('radr') !== 'off' && annunciator('radr') !== 'nominal' },
   { id: 'missile-lock', group: 'missile', level: 'warning', message: 'Missile lock', active: () => annunciator('misl') === 'major' && !annunciatorFlashing('misl') },
   { id: 'missile-launch', group: 'missile', level: 'critical', message: 'Missile incoming', active: () => annunciator('misl') === 'major' && annunciatorFlashing('misl') },
 ]

@@ -11,7 +11,8 @@ telemetrie/captures/
 telemetrie/proto/*.proto
 
 # --- Générés ---
-# données vaisseaux mises à jour depuis l'interface (la copie publiée est interface/public/data)
+# données du service : vaisseaux mis à jour depuis l'interface (la copie publiée est interface/public/data),
+# réglages communs (config.json) et sessions de jeu enregistrées (sessions/, personnelles)
 service/data/
 node_modules/
 memoire/partage/

@@ -178,3 +178,10 @@ html.cols-1 .top > .brand { display: none; }
     scrollbar-color: var(--cyan) transparent;
   }
 }
+
+// Couleur des événements du jeu (EventPicto, infobulles, liste des sessions) : --m pour les bordures, color pour le texte
+.ev-info, .ev-abandon, .ev-downed, .ev-revived { --m: rgba(240, 248, 248, 0.75); }
+.ev-note, .ev-board, .ev-exit { --m: var(--amber); }
+.ev-kill, .ev-killp, .ev-success { --m: var(--green); }
+.ev-death, .ev-deathp, .ev-failure, .ev-loss { --m: var(--red); }
+[class*='ev-'] { color: var(--m); }

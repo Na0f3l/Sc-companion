@@ -8,6 +8,7 @@ import './hit' // flash rouge 0,2 s quand on prend des dégâts
 import './wakelock' // garder l'écran allumé (réglage du menu)
 import './viewport' // petits écrans : mise en page PC réduite (zoom) au lieu d'être réorganisée
 import AppMenu from './components/AppMenu.vue'
+import { openSessions } from './sessionsPanel'
 import FlightView from './views/FlightView.vue'
 import FootView from './views/FootView.vue'
 import AlertOverlay from './components/AlertOverlay.vue'
@@ -15,6 +16,7 @@ import IdleScreen, { type IdleKind } from './components/IdleScreen.vue'
 import MemoryBar from './components/MemoryBar.vue'
 import Marquee from './components/Marquee.vue'
 import ShipInfo from './components/ShipInfo.vue'
+import SessionsPanel from './components/SessionsPanel.vue'
 import DataUpdate from './components/DataUpdate.vue'
 import MobileConnect from './components/MobileConnect.vue'
 import { shipName } from './ships'
@@ -115,11 +117,17 @@ const TABS = [
             <path v-else d="M16 9l6 6M22 9l-6 6" />
           </svg>
         </button>
-        <!-- Mobile connect : QR code pour ouvrir l'appli sur le téléphone (aussi dans le menu) -->
+        <!-- Mobile connect : QR code pour ouvrir l'appli sur le téléphone (sur le PC seulement) -->
         <button v-if="mobile?.onPc" type="button" class="test icon" title="Mobile connect" aria-label="Mobile connect" @click="mobile?.open()">
           <svg viewBox="0 0 24 24" aria-hidden="true">
             <rect x="7" y="3" width="10" height="18" rx="1.5" />
             <path d="M11 18h2" />
+          </svg>
+        </button>
+        <!-- Sessions enregistrées : analyse (panneau Sessions) -->
+        <button type="button" class="test icon" title="Sessions" aria-label="Sessions" @click="openSessions">
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M3 6.5V19h18V8.5h-9.2L9.8 6.5Z" />
           </svg>
         </button>
         <AppMenu />
@@ -128,6 +136,7 @@ const TABS = [
     </header>
 
     <ShipInfo :anchor="gameCtx === 'vol' ? ctxEl : undefined" :ship="shipClass" />
+    <SessionsPanel />
     <AlertOverlay />
     <MemoryBar />
     <!-- crédit SPViewer (source des données vaisseaux), onglet posé sur la bande mémoire, en bas à droite -->

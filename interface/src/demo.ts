@@ -108,4 +108,26 @@ const FOOT: Record<string, Value> = {
   'injury.left_arm': 3, // une blessure mineure, pour montrer le panneau Injuries
 }
 
-export const demoData = (view: DemoView): Record<string, Value> => ({ ...COMMON, ...(view === 'ship' ? SHIP : FOOT) })
+// Repères sous la courbe RAM (un de chaque picto), datés par rapport à l'ouverture de la démo
+const demoEvents = (): string => {
+  const ago = (s: number) => Date.now() - s * 1000
+  return JSON.stringify([
+    [ago(270), 'exit', 'Left controls: Arrow'],
+    [ago(250), 'info', 'Left armistice zone'],
+    [ago(200), 'board', 'Took controls: Hornet F7A Mk2'],
+    [ago(175), 'note', 'Contract accepted: Protect Vital Asset'],
+    [ago(150), 'info', 'Quantum travel'],
+    [ago(120), 'success', 'Contract complete: Protect Vital Asset'],
+    [ago(105), 'failure', 'Contract failed: Reclusive Bounty'],
+    [ago(90), 'kill', 'Destroyed Vanguard Sentinel'],
+    [ago(70), 'downed', 'Incapacitated'],
+    [ago(55), 'revived', 'Revived'],
+    [ago(40), 'death', 'You died'],
+  ])
+}
+
+export const demoData = (view: DemoView): Record<string, Value> => ({
+  ...COMMON,
+  'log.events': demoEvents(),
+  ...(view === 'ship' ? SHIP : FOOT),
+})
