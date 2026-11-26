@@ -5,15 +5,15 @@ defineProps<{
   tab: string
   source?: string // ex. 'flight.instruments' : le champ qui alimente l'écran
 }>()
+const DEV = import.meta.env.DEV
 </script>
 
 <template>
-  <article class="mfd">
+  <!-- pas de titre affiché : l'onglet du bas nomme déjà l'écran ; le titre reste pour les lecteurs d'écran -->
+  <article class="mfd" :aria-label="title">
     <div class="inner">
-      <header>
-        <span class="title">{{ title }}</span>
-        <code v-if="source">{{ source }}</code>
-      </header>
+      <!-- champ source : aide au développement, affiché seulement avec le serveur Vite (npm run dev), jamais dans la version compilée -->
+      <code v-if="DEV && source">{{ source }}</code>
       <!-- <slot /> : le contenu placé entre <MfdPanel> et </MfdPanel> arrive ici -->
       <div class="body"><slot /></div>
       <footer>{{ tab }}</footer>
@@ -43,20 +43,9 @@ defineProps<{
   @include bevel;
 }
 
-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: baseline;
-  gap: 8px;
-}
-
-.title {
-  @include label;
-  letter-spacing: 0.14em;
-}
-
 code {
   @include numeric;
+  margin-bottom: -6px;
   font-size: 10px;
   color: var(--cyan-dim);
   overflow-wrap: anywhere;
@@ -83,19 +72,24 @@ footer {
   text-align: center;
 }
 
-// Téléphone : l'onglet du bas répète le titre, le nom du champ source est une info de développeur
+// Téléphone : marges réduites, onglet du bas compact (seul nom de l'écran), pas de champ source
 @include phone {
   .inner {
     gap: 8px;
-    padding: 8px 10px 10px;
+    padding: 8px 10px 0;
   }
 
   .body {
     gap: 8px;
   }
 
-  code,
   footer {
+    margin: 0 -10px;
+    padding: 4px 10px 4px calc(10px + 0.2em);
+    font-size: 11px;
+  }
+
+  code {
     display: none;
   }
 }

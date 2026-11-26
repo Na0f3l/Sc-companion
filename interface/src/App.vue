@@ -199,6 +199,7 @@ const TABS = [
 // Une seule ligne : le contexte (nom du vaisseau) rétrécit et défile plutôt que de pousser
 // le menu à la ligne. Sous 760 px, l'en-tête passe sur deux lignes (le groupe de droite reste à droite).
 .top {
+  --chip-h: 24px; // hauteur commune du cadre vaisseau / contexte et du badge de mode (PU, AC…)
   display: flex;
   align-items: center;
   gap: 12px 5px;
@@ -234,7 +235,9 @@ const TABS = [
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  padding: 4px 10px;
+  box-sizing: border-box;
+  height: var(--chip-h); // même hauteur que le badge PU / AC à côté
+  padding: 0 10px;
   border: 1px solid var(--cyan-dim);
   background: var(--panel);
   font: 500 11px var(--font-ui);
@@ -296,7 +299,11 @@ const TABS = [
 }
 
 .gmode {
-  padding: 3px 8px;
+  display: inline-flex;
+  align-items: center;
+  box-sizing: border-box;
+  height: var(--chip-h);
+  padding: 0 8px;
   border: 1px solid var(--cyan-dim);
   color: var(--cyan);
   font: 600 11px var(--font-num);
@@ -505,7 +512,7 @@ const TABS = [
   // le contexte rétrécit (le nom défile) au lieu de passer sous PU
   .ctx {
     overflow: hidden;
-    padding: 4px 8px;
+    padding: 0 8px;
   }
 
   .right {

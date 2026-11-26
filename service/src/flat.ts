@@ -13,12 +13,14 @@ export interface Patch {
   del: string[]
 }
 
-// Arrondi à 2 décimales : en dessous, l'écran ne montre pas la différence,
+// Tronqué à 2 décimales : en dessous, l'écran ne montre pas la différence,
 // et ça évite d'envoyer des micro-variations (la faim baisse de 0,0007 par trame).
+// Tronqué et non arrondi, comme le jeu : 4,78/4,8 de H-Fuel = 0,9958 → 0,99 (99 % en jeu), pas 1.
+// Petite marge (1e-4 centième) pour les flottants juste sous un cran : 0,99999994 (plein) → 1.
 // Les très grandes valeurs (3,4e38 = « pas de mesure » envoyé par le jeu) sont gardées telles quelles.
 function round(v: number): number {
   if (Number.isInteger(v) || Math.abs(v) > 1e15) return v
-  return Math.round(v * 100) / 100
+  return Math.trunc(v * 100 + Math.sign(v) * 1e-4) / 100
 }
 
 export function flatten(obj: unknown, prefix = '', out: Flat = {}): Flat {

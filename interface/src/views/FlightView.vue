@@ -82,6 +82,8 @@ type Flag = { label: string; title: string; danger?: boolean }
 // Pas de condition sur « enabled » : ESP coupé en jeu, le jeu passe enabled ET active à faux (vérifié en direct).
 // Moteurs coupés (jauge H-Fuel à 0, constaté en jeu) : le jeu coupe aussi l'ESP → rien à signaler.
 const enginesOn = () => num(FLI + 'hydrogen_fuel') > 0
+// Jauges de carburant : le jeu tronque (99,6 % → 99 %), pas d'arrondi. À réutiliser pour Q-Fuel quand il sera envoyé.
+const fuelPct = (v: number) => Math.floor(Math.min(1, Math.max(0, v)) * 100 + 1e-6)
 const espLost = () => mode.value?.label !== 'NAV' && bool(VEH + 'power.powerplants') && enginesOn() && !ifcsOn('ifcs_esp')
 // Compensateur de gravité : censé être toujours actif → rien quand il l'est, bande rouge quand il est coupé
 // (vaisseau alimenté, tous modes : il compte aussi en NAV près d'une planète).
@@ -204,12 +206,17 @@ const role = computed(() => {
     <MfdPanel class="prop" title="Propulsion" source="fuel · boost · g_meter" tab="PROPULSION">
       <div class="bars">
         <div class="bar">
-          <span class="num">{{ Math.round(num(FLI + 'hydrogen_fuel') * 100) }} %</span>
+          <span class="num">{{ fuelPct(num(FLI + 'hydrogen_fuel')) }} %</span>
           <SegBar :value="num(FLI + 'hydrogen_fuel')" :segments="12" vertical />
           <span class="lbl">H-Fuel</span>
         </div>
-        <!-- Q-Fuel : prévu dans le schéma mais pas encore envoyé par le jeu (LIVE 4.10) -->
-        <div class="bar off">
+        <!-- Q-Fuel : prévu dans le schéma mais pas encore envoyé par le jeu (LIVE 4.10) → s'active seul dès qu'il arrive -->
+        <div v-if="has(FLI + 'quantum_fuel')" class="bar">
+          <span class="num">{{ fuelPct(num(FLI + 'quantum_fuel')) }} %</span>
+          <SegBar :value="num(FLI + 'quantum_fuel')" :segments="12" vertical />
+          <span class="lbl">Q-Fuel</span>
+        </div>
+        <div v-else class="bar off">
           <span class="num">— %</span>
           <SegBar :value="0" :segments="12" vertical alert="none" />
           <span class="lbl">Q-Fuel</span>
@@ -217,7 +224,6 @@ const role = computed(() => {
         </div>
       </div>
       <GMeter :g="gCur" :limit="gMax" :speed="Math.abs(speed)" />
-      <div class="row"><span class="lbl">G limit</span><span class="num">{{ gMax.toFixed(1) }} G</span></div>
     </MfdPanel>
 
 
@@ -268,7 +274,7 @@ const role = computed(() => {
 }
 
 .top {
-  --vbar-h: 120px; // barres un peu plus courtes : moins de hauteur pour le panneau
+  --vbar-h: 108px; // barres plus courtes : moins de hauteur pour la rangée du haut
   --mode-h: 22px; // hauteur du badge NAV / SCM au-dessus des barres
   --mode-gap: 8px;
   display: grid;
@@ -322,17 +328,28 @@ const role = computed(() => {
 
 .side {
   display: grid;
-  grid-template-rows: 1fr 1fr; // moitié / moitié, et la colonne s'aligne sur Flight / Propulsion
+  // Pilot à sa hauteur utile, Annunciators prend le reste : la colonne s'aligne sur Flight / Propulsion
+  // sans imposer deux moitiés égales (qui allongeaient toute la rangée et laissaient du vide dans Pilot)
+  grid-template-rows: 1fr auto;
   gap: 14px;
   min-width: 0;
 }
 // 2 et 1 colonnes : règles dans styles/base.scss (un sélecteur sur <html> ne passe pas dans un style scoped)
 
-// Écran pilote le plus court possible : contenu tassé en haut (pas réparti sur la hauteur de la rangée),
-// écarts minimaux. :deep(.body) = le contenu de MfdPanel.
+.side > :first-child :deep(.body) {
+  align-content: center; // voyants centrés dans la place restante
+}
+
+// Écran pilote le plus court possible, écarts minimaux. :deep(.body) = le contenu de MfdPanel.
 .crew :deep(.body) {
-  align-content: center; // contenu centré dans la hauteur disponible
-  gap: 16px; // un peu d'air entre les jauges et la ligne coeur / O2 / siège
+  align-content: start;
+  gap: 10px; // entre les jauges et la ligne coeur / O2 / siège
+}
+
+// Propulsion : jauges carburant et G-meter regroupés au centre (pas étirés sur la hauteur de la rangée)
+.prop :deep(.body) {
+  align-content: center;
+  gap: 10px;
 }
 
 // trois valeurs côte à côte, libellé collé à la valeur
@@ -519,7 +536,7 @@ const role = computed(() => {
     width: 46px;
   }
 
-  // barres H-Fuel / Q-Fuel à gauche, G-meter à droite, limite G en dessous
+  // barres H-Fuel / Q-Fuel à gauche, G-meter à droite
   .prop :deep(.body) {
     grid-template-columns: auto minmax(0, 1fr);
     align-items: center;
@@ -529,12 +546,8 @@ const role = computed(() => {
     gap: 8px;
   }
 
-  .prop .row {
-    grid-column: 1 / -1;
-  }
-
   .warns {
-    margin: auto -10px -10px; // suit les marges réduites du panneau (MfdPanel)
+    margin: auto -10px -8px; // suit les marges réduites du panneau et l'écart avant l'onglet (MfdPanel)
   }
 
   .esp-warn {

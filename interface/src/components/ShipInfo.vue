@@ -8,7 +8,7 @@ import { pageZoom } from '@/viewport'
 // Loupe à droite du nom : recherche d'un autre vaisseau (suggestions à la frappe) pour consulter sa fiche.
 // À la fermeture de la fiche, on revient au vaisseau piloté.
 import { computed, nextTick, onBeforeUnmount, ref, shallowRef, watch } from 'vue'
-import { dataUrl, searchShips, shipInfo, shipsStamp } from '@/ships'
+import { dataUrl, searchShips, shipInfo, shipKey, shipName, shipsStamp } from '@/ships'
 
 // Fiche détaillée (ships-info.json) : seulement ce qui ne dépend pas des composants équipés
 // (boucliers, armes, quantum, signatures retirés : ils changent avec l'équipement)
@@ -115,7 +115,7 @@ async function startSearch(): Promise<void> {
 // recherche annulée sans fiche à montrer (ouverte à pied, rien choisi) : on referme tout
 function cancelSearch(): void {
   searching.value = false
-  if (!base.value) open.value = false
+  if (!shown.value) open.value = false
 }
 function choose(key: string | undefined): void {
   if (!key) return
@@ -143,7 +143,10 @@ const n = (v: number | undefined, unit = '') => (v === undefined ? undefined : `
 const pct = (x: number) => `${Math.round(x * 100)}%`
 
 const base = computed(() => shipInfo(shown.value))
-const d = computed(() => all.value?.ships[shown.value])
+// clé réellement utilisée : celle du modèle de base pour une variante absente des sources (DRAK_Vulture_Teach)
+const key = computed(() => shipKey(shown.value))
+const variant = computed(() => !!key.value && key.value !== shown.value)
+const d = computed(() => (key.value ? all.value?.ships[key.value] : undefined))
 
 type Row = [string, string | undefined]
 // Sections de la fiche ; les lignes sans valeur sont masquées, les sections vides aussi
@@ -195,7 +198,7 @@ const sections = computed<{ title: string; rows: Row[] }[]>(() => {
 <template>
   <Teleport to="body">
     <div
-      v-if="open && (base || searching)"
+      v-if="open && (shown || searching)"
       ref="box"
       class="shipinfo"
       role="dialog"
@@ -230,15 +233,17 @@ const sections = computed<{ title: string; rows: Row[] }[]>(() => {
           <p v-else-if="query.trim()" class="none">No ship found</p>
         </div>
         <div v-else class="title">
-          <b>{{ base?.name }}</b>
+          <b>{{ shipName(shown) }}</b>
           <span v-if="base?.maker">{{ base.maker }}</span>
           <em v-if="picked && ship && picked !== ship">Not your current ship</em>
+          <em v-else-if="variant">Special edition: base model data</em>
+          <em v-else-if="!base">No data for this ship</em>
         </div>
         <button type="button" class="find" :class="{ on: searching }" :aria-label="searching ? 'Cancel search' : 'Search another ship'" :title="searching ? 'Cancel' : 'Search another ship'" @click="searching ? cancelSearch() : startSearch()">
           <svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="6.5" cy="6.5" r="4.5" /><path d="M10 10l4.5 4.5" /></svg>
         </button>
       </header>
-      <p v-if="!all" class="wait">Loading…</p>
+      <p v-if="!all && base" class="wait">Loading…</p>
       <section v-for="s in sections" :key="s.title">
         <h3>{{ s.title }}</h3>
         <dl>

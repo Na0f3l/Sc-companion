@@ -43,9 +43,24 @@ export async function loadShips(): Promise<void> {
 }
 void loadShips()
 
-/** Données du vaisseau, ou undefined s'il est inconnu (nouveau vaisseau, variante absente des sources). */
+/**
+ * Clé des données pour un class_name : lui-même s'il est connu, sinon le modèle de base en retirant les
+ * suffixes un à un (DRAK_Vulture_Teach → DRAK_Vulture : éditions spéciales absentes des sources).
+ */
+export function shipKey(className: string): string | undefined {
+  let k = className
+  for (;;) {
+    if (SHIPS.value[k]) return k
+    const i = k.lastIndexOf('_')
+    if (i <= 0) return undefined
+    k = k.slice(0, i)
+  }
+}
+
+/** Données du vaisseau (ou de son modèle de base), ou undefined s'il est inconnu (nouveau vaisseau). */
 export function shipInfo(className: string): Ship | undefined {
-  return SHIPS.value[className]
+  const k = shipKey(className)
+  return k ? SHIPS.value[k] : undefined
 }
 
 /**
@@ -73,5 +88,9 @@ export function searchShips(query: string, max = 8): { key: string; name: string
 
 /** Nom affiché : nom du jeu si connu, sinon le class_name rendu lisible. */
 export function shipName(className: string): string {
-  return SHIPS.value[className]?.name ?? className.replaceAll('_', ' ')
+  if (SHIPS.value[className]) return SHIPS.value[className].name
+  const base = shipInfo(className)
+  // variante inconnue : nom du modèle de base + le suffixe (« Vulture Teach »)
+  const k = shipKey(className)
+  return base && k ? `${base.name} ${className.slice(k.length + 1).replaceAll('_', ' ')}` : className.replaceAll('_', ' ')
 }
