@@ -7,7 +7,7 @@
 import { reactive } from 'vue'
 
 type V = { x: number; y: number }
-type Rock = V & { vx: number; vy: number; r: number; size: 1 | 2 | 3; a: number; va: number; shape: number[] }
+type Rock = V & { vx: number; vy: number; r: number; size: 1 | 2 | 3; a: number; va: number; shape: number[]; grow: number }
 type Shot = V & { vx: number; vy: number; life: number }
 type Spark = V & { vx: number; vy: number; life: number; a: number; len: number }
 type Circle = { x: number; y: number; r: number }
@@ -23,7 +23,9 @@ const VMAX = 208
 const BOOST = 2.75 // Maj : poussée ×2,75 (même poussée boost qu’avant)…
 const BOOST_VMAX = 420 // …et vitesse max relevée, qui retombe en douceur au relâchement
 const SHOT_V = 540
-const SHOT_LIFE = 0.85
+// portée des tirs : ~55 % du plus petit côté du terrain (pas de tir qui fait le tour d'un téléphone), 180 à 460 px
+const shotLife = () => Math.max(180, Math.min(460, 0.55 * Math.min(W, H))) / SHOT_V
+const GROW = 1.2 // s : une nouvelle vague « approche » (grossit) avant d'être active
 const SHOT_MAX = 6
 const SHOT_GAP = 0.17
 const AUTO_SHOT_GAP = 0.7 // pilote auto : tir posé, pas en rafale
@@ -64,6 +66,7 @@ function makeRock(x: number, y: number, size: 1 | 2 | 3): Rock {
     vx: Math.cos(dir) * sp, vy: Math.sin(dir) * sp,
     a: rnd(0, 6.28), va: rnd(-1, 1),
     shape: Array.from({ length: 9 + size }, () => rnd(0.72, 1.12)),
+    grow: 1,
   }
 }
 
@@ -89,7 +92,7 @@ function newWave() {
   const n = Math.min(3 + wave, 9)
   for (let i = 0; i < n; i++) {
     const p = freeSpot(50)
-    rocks.push(makeRock(p.x, p.y, 3))
+    rocks.push({ ...makeRock(p.x, p.y, 3), grow: 0 })
   }
 }
 
@@ -301,7 +304,7 @@ function step(dt: number) {
         y: ship.y + Math.sin(ship.a) * SHIP_R,
         vx: ship.vx + Math.cos(ship.a) * SHOT_V,
         vy: ship.vy + Math.sin(ship.a) * SHOT_V,
-        life: SHOT_LIFE,
+        life: shotLife(),
       })
     }
   } else if (hud.over) {
@@ -317,6 +320,7 @@ function step(dt: number) {
     k.x += k.vx * dt
     k.y += k.vy * dt
     k.a += k.va * dt
+    if (k.grow < 1) k.grow = Math.min(1, k.grow + dt / GROW)
     wrap(k, k.r)
     bounce(k, k.r * 0.9, 1)
   }
@@ -334,7 +338,7 @@ function step(dt: number) {
       dead = true
     }
     if (!dead) {
-      const j = rocks.findIndex((k) => Math.hypot(k.x - s.x, k.y - s.y) < k.r)
+      const j = rocks.findIndex((k) => k.grow >= 1 && Math.hypot(k.x - s.x, k.y - s.y) < k.r)
       if (j >= 0) {
         splitRock(j)
         dead = true
@@ -345,7 +349,7 @@ function step(dt: number) {
 
   // vaisseau contre rochers
   if (ship.alive && ship.shield <= 0) {
-    const j = rocks.findIndex((k) => Math.hypot(k.x - ship.x, k.y - ship.y) < k.r * 0.85 + SHIP_R * 0.7)
+    const j = rocks.findIndex((k) => k.grow >= 1 && Math.hypot(k.x - ship.x, k.y - ship.y) < k.r * 0.85 + SHIP_R * 0.7)
     if (j >= 0) {
       splitRock(j)
       killShip()
@@ -370,11 +374,14 @@ function draw(g: CanvasRenderingContext2D) {
 
   g.strokeStyle = colors.rock
   for (const k of rocks) {
+    // en approche : petit et pâle, grossit jusqu'à sa taille (sans collision tant qu'il n'y est pas)
+    const sc = k.grow < 1 ? 1 - (1 - k.grow) ** 2 : 1
+    g.globalAlpha = k.grow < 1 ? 0.25 + 0.6 * k.grow : 1
     g.beginPath()
     const n = k.shape.length
     for (let i = 0; i < n; i++) {
       const a = k.a + (i / n) * Math.PI * 2
-      const r = k.r * k.shape[i]!
+      const r = k.r * sc * k.shape[i]!
       const x = k.x + Math.cos(a) * r
       const y = k.y + Math.sin(a) * r
       if (i) g.lineTo(x, y)
@@ -383,6 +390,7 @@ function draw(g: CanvasRenderingContext2D) {
     g.closePath()
     g.stroke()
   }
+  g.globalAlpha = 1
 
   if (ship.alive && (ship.shield <= 0 || Math.floor(ship.shield * 8) % 2 === 0)) {
     const { x, y, a } = ship
@@ -488,11 +496,12 @@ export function startRockfield(canvas: HTMLCanvasElement, obstacles: () => { cir
   // le terrain s'arrête au-dessus de la bande RAM (fixée en bas), sinon tout passerait dessous
   const floor = () => {
     const band = document.querySelector('.membar .band')?.getBoundingClientRect()
-    return Math.round(band && band.height ? Math.min(band.top, window.innerHeight) : window.innerHeight)
+    // pas de min avec innerHeight : sur Chrome Android il reste parfois sur l'ancienne valeur en passant en plein écran
+    return Math.round(band && band.height ? band.top : document.documentElement.clientHeight)
   }
   const layout = () => {
     const dpr = Math.min(window.devicePixelRatio || 1, 2)
-    W = window.innerWidth
+    W = document.documentElement.clientWidth
     H = floor()
     canvas.style.height = `${H}px`
     canvas.width = Math.round(W * dpr)
@@ -501,7 +510,7 @@ export function startRockfield(canvas: HTMLCanvasElement, obstacles: () => { cir
     ;({ circle, rects } = obstacles())
   }
   const relayout = () => {
-    if (floor() !== H) layout()
+    if (floor() !== H || document.documentElement.clientWidth !== W) layout()
     else ({ circle, rects } = obstacles())
   }
 
@@ -531,6 +540,8 @@ export function startRockfield(canvas: HTMLCanvasElement, obstacles: () => { cir
   const ro = new ResizeObserver(relayout)
   ro.observe(document.body)
   window.addEventListener('resize', layout)
+  document.addEventListener('fullscreenchange', layout)
+  window.visualViewport?.addEventListener('resize', relayout)
   window.addEventListener('scroll', relayout, { passive: true })
   window.addEventListener('keydown', onKey)
   window.addEventListener('keyup', onKey)
@@ -544,6 +555,8 @@ export function startRockfield(canvas: HTMLCanvasElement, obstacles: () => { cir
     cancelAnimationFrame(raf)
     ro.disconnect()
     window.removeEventListener('resize', layout)
+    document.removeEventListener('fullscreenchange', layout)
+    window.visualViewport?.removeEventListener('resize', relayout)
     window.removeEventListener('scroll', relayout)
     window.removeEventListener('keydown', onKey)
     window.removeEventListener('keyup', onKey)

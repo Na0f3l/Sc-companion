@@ -73,7 +73,10 @@ const block1 = ref<HTMLElement>()
 const block2 = ref<HTMLElement>()
 const block3 = ref<HTMLElement>()
 let stop: (() => void) | undefined
+// Pas de mini-jeu sur téléphone / tablette pour l'instant (redimensionnements, maniabilité tactile à revoir)
+const game = !window.matchMedia('(pointer: coarse)').matches
 onMounted(() => {
+  if (!game) return
   stop = startRockfield(canvas.value!, () => {
     const e = emblem.value?.getBoundingClientRect()
     const rects = [block1, block2, block3].map((b) => b.value?.getBoundingClientRect()).filter((t): t is DOMRect => !!t?.width)
@@ -88,7 +91,7 @@ onBeforeUnmount(() => stop?.())
 
 <template>
   <section class="idle" :class="`is-${kind}`">
-    <canvas ref="canvas" class="field" aria-hidden="true" />
+    <canvas v-if="game" ref="canvas" class="field" aria-hidden="true" />
     <svg ref="emblem" class="emblem" viewBox="0 0 200 200" aria-hidden="true">
       <g class="static">
         <circle cx="100" cy="100" r="92" />
@@ -122,7 +125,7 @@ onBeforeUnmount(() => stop?.())
         <!-- voir les écrans sans le jeu : visiteurs, ou développement sans lancer SC -->
         <button type="button" class="demo" @click="$emit('demo')">Preview mode<span>See the screens with sample data</span></button>
         <!-- mini-jeu : vies (cœurs pleins puis vidés, largeur fixe), score, meilleur score ; consignes en démo -->
-        <p class="game">
+        <p v-if="game" class="game">
           <template v-if="hud.playing">
             <span class="hearts" :aria-label="`${hud.lives} lives`">
               <svg v-for="i in 3" :key="i" viewBox="0 0 16 14" :class="{ full: i <= hud.lives }" aria-hidden="true">

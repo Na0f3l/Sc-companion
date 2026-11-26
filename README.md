@@ -15,7 +15,7 @@ A lightweight companion screen for Star Citizen, for a second monitor, a tablet 
 - **Game.log events**: injuries, deaths, kills, contracts, server changes, and a timeline under the RAM chart.
 - **Session recording**: each play session is saved with its memory curve and events, so you can review it later.
 - **Ship sheets**: speeds, acceleration, fuel and more for any ship.
-- **Something to do while it loads**: a small decoupled-flight rock-breaking game plays in the background of the waiting screen. Arrows or WASD to fly, Shift to boost, Space to fire (touch: hold where you want to go). Add `?rocks` to the address to play it during a game session too.
+- **Something to do while it loads**: a small decoupled-flight rock-breaking game plays in the background of the waiting screen. Arrows or WASD to fly, Shift to boost, Space to fire. PC only for now (not on phones and tablets). Add `?rocks` to the address to play it during a game session too.
 
 Read-only. It never touches the game, its files or its memory, and your data stays on your PC.
 

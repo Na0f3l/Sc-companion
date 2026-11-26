@@ -1,6 +1,6 @@
 {
   "name": "sc-companion-service",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "private": true,
   "description": "Service local : récupère la télémétrie de Star Citizen et la diffuse à l'interface par WebSocket",
   "type": "module",
