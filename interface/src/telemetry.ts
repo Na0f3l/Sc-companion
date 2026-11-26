@@ -123,6 +123,13 @@ export function sendGameDir(action: 'browse' | 'auto'): boolean {
   return true
 }
 
+/** Allume la télémétrie du jeu (variable GRPC_CLIENT_SERVER_ENABLED du compte Windows, service/src/grpcenv.ts). */
+export function sendEnableTelemetry(): boolean {
+  if (demo.value || ws?.readyState !== WebSocket.OPEN) return false
+  ws.send(JSON.stringify({ type: 'grpcEnv', action: 'enable' }))
+  return true
+}
+
 // ---- Mode démo ----------------------------------------------------------------------
 // Voir les écrans sans jouer : l'affichage est figé sur des valeurs d'exemple (demo.ts). Pas de simulation, juste
 // les panneaux. Seulement hors partie (jeu fermé ou au menu) : la connexion au service reste ouverte en

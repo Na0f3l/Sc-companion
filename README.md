@@ -16,15 +16,13 @@ Read-only. It never touches the game, its files or its memory, and your data sta
 
 1. Download `SC-Companion-<version>-win-x64.zip` from the [Releases](https://github.com/Na0f3l/Sc-companion/releases) page.
 2. Extract it anywhere, for example to `Documents\SC Companion`. Nothing else is needed: Node.js comes with it.
-3. Double-click **`Lancer.vbs`**. The service starts in the background and the companion screen opens in your browser.
+3. Double-click **`SC Companion.exe`**. The service starts in the background and the companion screen opens in your browser.
 
-An SC Companion icon appears next to the clock. Double-click it to open the screen. Right-click it for Sessions, Mobile connect or **Quit**.
+An SC Companion icon appears next to the clock. Double-click it to open the screen. Right-click it for Sessions, Mobile connect or **Quit**. For a desktop shortcut, right-click `SC Companion.exe` › *Send to* › *Desktop (create shortcut)*.
 
-To get a desktop shortcut, right-click `Lancer.vbs` › *Show more options* › *Create shortcut*, then move the shortcut to your desktop. You can give it the `icone.ico` icon in its *Properties*.
+**Game telemetry.** The live HUD needs the game's telemetry, which is off by default. If it's off, the companion screen shows an **Enable game telemetry** button. It sets `GRPC_CLIENT_SERVER_ENABLED=true` for your Windows account, no admin rights needed. Then quit the RSI Launcher from its icon next to the clock and start it again. The screen tells you when a restart is still needed.
 
-**Turn on the game's telemetry (LIVE 4.10).** Set the Windows environment variable `GRPC_CLIENT_SERVER_ENABLED` to `true`: Start › *Edit environment variables for your account* › *New…*. Then restart the RSI Launcher.
-
-**First launch warnings.** The download isn't code-signed, so Windows SmartScreen or your antivirus may warn about it. If Windows Firewall asks about Node.js, allow **Private networks**: you only need that to use the screen on your phone.
+**First launch warnings.** The download isn't code-signed, so Windows may show *Windows protected your PC*: click *More info* › *Run anyway*. Some antivirus programs may also warn about it. If Windows Firewall asks about Node.js, allow **Private networks**: you only need that to use the screen on your phone.
 
 ### On your phone or tablet
 
@@ -47,6 +45,7 @@ Requires Node 24 (TypeScript runs natively, no build step for the service).
 | `service/` | Node service: reads the game's gRPC telemetry (read-only) or replays a capture, reads Game.log, measures memory / CPU / GPU, records sessions, and serves the interface. Pushes changes to the screens over WebSocket (5 Hz max, only changed values, fully paused when no screen is connected). |
 | `interface/` | Vue 3 + Vite + TypeScript + SCSS: HUD-style screens (flight, character), full-screen alerts with sound. |
 | `scripts/` | `release.mjs`: builds the portable zip. |
+| `launcher/` | `Launcher.cs`: source of `SC Companion.exe`. |
 | `telemetrie/` | Tools: probe, fake server, raw capture of unknown fields. |
 | `memoire/` | Standalone PowerShell memory / CPU / GPU tracker with leak detection (not in the release). |
 
@@ -55,11 +54,11 @@ cd interface && npm install && npm run build   # after every interface change
 cd service   && npm install && node src/index.ts  # then open http://localhost:2950
 ```
 
-`Lancer.vbs` also works from the repository: it uses the installed Node when there is no bundled `node\node.exe`. `npm run dev` in `interface/` is only for development: in normal use the service serves the built interface itself (Vite would cost ~500 MB).
+The release script also puts a copy of `SC Companion.exe` at the repository root (ignored by Git). There it starts the service with the installed Node, since there's no bundled `node\node.exe`. Launcher options: `--port <n>`, `--no-browser`; any other arguments go to the service. `Lancer.vbs` does the same, but VBScript is being removed from Windows. `npm run dev` in `interface/` is only for development: in normal use the service serves the built interface itself (Vite would cost ~500 MB).
 
 Service options: `--game-dir <folder>` (forces the game folder), `--port <n>`, `--replay ../telemetrie/captures` (replays captures), `--no-tray`. Start it with `node` directly rather than `npm run`, because npm keeps a ~60 MB parent process alive.
 
-**Release:** set the version in `interface/package.json`, then run `node scripts/release.mjs`. It produces `release/SC-Companion-<version>-win-x64.zip`. The zip contains the official Node.js for the current version (checksum verified) with its license, the service with production dependencies only, the built interface, the launcher, README and LICENSE.
+**Release:** set the version in `interface/package.json`, then run `node scripts/release.mjs`. It produces `release/SC-Companion-<version>-win-x64.zip`. The zip contains the launcher `SC Companion.exe` (`launcher/Launcher.cs`, compiled with the C# compiler that ships with Windows), the official Node.js for the current version (checksum verified) with its license, the service with production dependencies only, the built interface, README and LICENSE.
 
 **Telemetry schema:** not included and not downloaded. The service extracts it from the installed game (`Bin64\StarCitizen.exe` embeds its protobuf descriptors), once per game version, and caches it in `%LOCALAPPDATA%\SC Companion`, so it always matches the installed version. As a fallback, it uses `telemetrie/proto/sc_telemetry.proto` if present (for example from the community project [Sokren/sc-telemetry-deck](https://github.com/Sokren/sc-telemetry-deck)), only when the executable can't be read.
 

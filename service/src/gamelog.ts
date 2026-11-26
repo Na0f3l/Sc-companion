@@ -22,6 +22,9 @@ const MODE_RX = /gamerules="([^"]+)"|Requesting game mode [^/\s"]*\/(\w+)|(<Join
 // chargement fermé, personnage en jeu) ; un nouvel écran de chargement (« OpenLoadingScreen] Started ») le remet à zéro.
 // « OnClientSpawned » ne convient pas : depuis la 5.0, il est aussi écrit au menu, pour le personnage de l'écran d'accueil.
 const LOAD_RX = /OpenLoadingScreen\] Started|<Context Establisher Done> establisher="CReplicationModel".*?gamerules="(\w+)"/g
+// En-tête du log : variables d'environnement reçues par le jeu (« [Env Var  ] GRPC_CLIENT_SERVER_ENABLED=true »), puis
+// ligne de commande (« [Cmdline  ] … »). Variable absente de l'en-tête = jeu lancé sans la télémétrie.
+const GRPC_ENV_RX = /\[Env Var\s*\] GRPC_CLIENT_SERVER_ENABLED=(\S+)|\[Cmdline\*?\s*\]/
 
 // Blessures : notifications du HUD, ex. « Minor Injury Detected - Right leg - Tier 3 Treatment Required ».
 // Tier 3 = mineure, 2 = modérée, 1 = grave. Le jeu ne note PAS la guérison : voir clearInjuries().
@@ -149,6 +152,8 @@ export function createGameLogReader(gameDir: () => string, onEvent?: (e: LogEven
   let rest = '' // fin de ligne incomplète, gardée pour la lecture suivante
   let mode: GameMode | null = null
   let loaded = false // chargement terminé, personnage en jeu (LOAD_RX)
+  let grpcEnv: boolean | null = null // le jeu a-t-il reçu GRPC_CLIENT_SERVER_ENABLED=true ? (null : inconnu)
+  let headerFromStart = false // le prochain bloc lu commence au début du fichier (en-tête)
   // partie du corps → tier (la dernière notification fait foi) et moment où on l'a lue
   const injuries = new Map<string, { tier: number; at: number }>()
   let events: LogEvent[] = []
@@ -306,7 +311,11 @@ export function createGameLogReader(gameDir: () => string, onEvent?: (e: LogEven
     }
     if (size < pos) { pos = 0; rest = ''; mode = null; loaded = false; injuries.clear(); events = []; dirty = true; me = { id: '', name: '' }; wrecks.clear(); pendingKills = []; downedAt = null; myItems.clear() } // nouveau fichier (jeu relancé)
     if (size === pos) { flushKills(); pruneEvents(); return }
-    if (pos === 0 && size > MAX_FIRST_READ) pos = size - MAX_FIRST_READ // premier passage : la fin suffit
+    if (pos === 0) {
+      grpcEnv = null
+      headerFromStart = size <= MAX_FIRST_READ
+      if (size > MAX_FIRST_READ) pos = size - MAX_FIRST_READ // premier passage : la fin suffit (en-tête non lu)
+    }
     const fd = fs.openSync(file, 'r') // Node ouvre en lecture partagée : le jeu peut continuer d'écrire
     try {
       while (pos < size) {
@@ -331,6 +340,13 @@ export function createGameLogReader(gameDir: () => string, onEvent?: (e: LogEven
     LOAD_RX.lastIndex = 0
     for (let m = LOAD_RX.exec(lines); m; m = LOAD_RX.exec(lines)) loaded = !!m[1] && m[1] !== 'SC_Frontend'
     if (mode !== 'pu' && mode !== 'ac') loaded = false // menu, jeu quitté
+    if (grpcEnv === null && headerFromStart) { // en-tête : seulement si le fichier est lu depuis le début
+      const g = GRPC_ENV_RX.exec(lines)
+      if (g) { // 1re ligne [Cmdline] sans la variable avant : false
+        grpcEnv = g[1] !== undefined && g[1].toLowerCase() === 'true'
+        headerFromStart = false
+      }
+    }
     // blessures et soins dans l'ordre du log : une blessure soignée puis reprise reste affichée
     const changes: [number, () => void][] = []
     INJURY_RX.lastIndex = 0
@@ -396,6 +412,7 @@ export function createGameLogReader(gameDir: () => string, onEvent?: (e: LogEven
     flat: (): Flat => {
       const out: Flat = mode ? { 'game.mode': mode } : {}
       if (loaded) out['game.loaded'] = true
+      if (grpcEnv !== null) out['game.grpc_env'] = grpcEnv
       for (const [part, i] of injuries) out[`injury.${part}`] = i.tier
       if (events.length) out['log.events'] = eventsJson
       return out

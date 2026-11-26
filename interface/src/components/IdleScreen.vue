@@ -3,6 +3,8 @@
 // Un emblème façon radar : anneaux et graduations peints une fois, seul le balayage tourne
 // (transform, géré par la carte graphique).
 import { computed } from 'vue'
+import { tm } from '@/telemetry'
+import TelemetryHint from './TelemetryHint.vue'
 
 export type IdleKind = 'link' | 'offline' | 'menu' | 'loading' | 'notelemetry'
 
@@ -42,7 +44,18 @@ const TEXT: Record<IdleKind, { code: string; title: string; sub: string; hint: s
     hint: 'This game version has telemetry turned off. RAM tracking and session recording keep working',
   },
 }
-const t = computed(() => TEXT[props.kind])
+// Texte d'aide selon l'état réel de la télémétrie : « coupée par le jeu » seulement si le jeu l'a bien reçue allumée
+// (sinon l'encart TelemetryHint dit quoi faire) ; « Telemetry is live » seulement si le flux arrive vraiment
+const hint = computed(() => {
+  if (props.kind === 'notelemetry') {
+    return tm['game.grpc_env'] === true
+      ? 'This game version has telemetry turned off. RAM tracking and session recording keep working'
+      : 'RAM tracking and session recording keep working'
+  }
+  if (props.kind === 'loading' && tm['svc.telemetry'] !== 'live') return 'Data will appear once your character is in game'
+  return TEXT[props.kind].hint
+})
+const t = computed(() => ({ ...TEXT[props.kind], hint: hint.value }))
 
 // graduations de l'anneau extérieur (une toutes les 10°, plus longues tous les 30°)
 const ticks = Array.from({ length: 36 }, (_, i) => {
@@ -77,6 +90,8 @@ const ticks = Array.from({ length: 36 }, (_, i) => {
       <h2>{{ t.title }}</h2>
       <p class="sub">{{ t.sub }}</p>
       <p class="hint">{{ t.hint }}</p>
+      <!-- télémétrie du jeu éteinte sur le PC, ou à relancer : bouton et consignes -->
+      <TelemetryHint v-if="kind !== 'link'" :running="kind !== 'offline'" />
       <!-- voir les écrans sans le jeu : visiteurs, ou développement sans lancer SC -->
       <button type="button" class="demo" @click="$emit('demo')">Preview mode<span>See the screens with sample data</span></button>
     </div>

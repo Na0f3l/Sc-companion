@@ -17,6 +17,7 @@
 //                    ← { type: 'config', leakRate?, leakDuration? } : réglages communs (config.ts), renvoyés en cfg.*
 //                    ← { type: 'gameDir', action: 'browse' | 'auto' } : dossier du jeu (fenêtre de choix sur le PC,
 //                      ou retour à la détection automatique), renvoyé en cfg.game_dir*
+//                    ← { type: 'grpcEnv', action: 'enable' } : allume la télémétrie du jeu (grpcenv.ts), renvoyé en svc.grpc_env
 import http from 'node:http'
 import os from 'node:os'
 import { WebSocketServer, type WebSocket } from 'ws'
@@ -31,6 +32,7 @@ import { createSessionRecorder } from './sessions.ts'
 import { gameDir, setForcedGameDir, setRunningGameDir } from './paths.ts'
 import { pickGameFile } from './picker.ts'
 import { TOKEN, allowed, checkAccess } from './access.ts'
+import { enableGrpcEnv, grpcEnvEnabled } from './grpcenv.ts'
 import { createTray, openUrl } from './tray.ts'
 import { hasInterface, serveStatic } from './static.ts'
 import { checkLatest, serveData } from './shipdata.ts'
@@ -114,7 +116,8 @@ function tick(): void {
   if (frame) observe(frameFlat)
   const live = sessions.current()
   // état du flux de télémétrie (live, game not found, stream ended…) : distinguer « chargement » et « jeu sans télémétrie »
-  const tele = { 'svc.telemetry': source.status?.() ?? source.name }
+  // + variable GRPC_CLIENT_SERVER_ENABLED présente sur le PC (grpcenv.ts)
+  const tele = { 'svc.telemetry': source.status?.() ?? source.name, 'svc.grpc_env': grpcEnvEnabled() }
   const next = { ...frameFlat, ...system.flat(), ...gameLog.flat(), ...configFlat(), ...tele, ...(live ? { 'session.live': live } : {}) }
   const patch = diff(state, next)
   state = next
@@ -221,6 +224,7 @@ wss.on('connection', (ws) => {
       if (msg.type === 'config') updateConfig(msg as Record<string, unknown>) // diffusé à tous au tick suivant
       else if (msg.type === 'gameDir' && msg.action === 'auto') setGameDir('')
       else if (msg.type === 'gameDir' && msg.action === 'browse') void pickGameFile(gameDir()).then((p) => p && setGameDir(p))
+      else if (msg.type === 'grpcEnv' && msg.action === 'enable') enableGrpcEnv()
     } catch {
       /* message illisible : ignoré */
     }

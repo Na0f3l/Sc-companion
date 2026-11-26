@@ -1,11 +1,13 @@
-// Fabrique la version publiée : un zip portable pour Windows, à dézipper puis lancer (Lancer.vbs), sans rien installer.
+// Fabrique la version publiée : un zip portable pour Windows, à dézipper puis lancer (SC Companion.exe), sans rien
+// installer.
 //
 //   node scripts/release.mjs            → release/SC-Companion-<version>-win-x64.zip
 //   node scripts/release.mjs --no-build → sans recompiler l'interface
 //
-// Contenu : node\node.exe (Node officiel, même version que celui qui lance ce script, empreinte vérifiée) et sa
-// licence, le service (src + dépendances de production seulement), l'interface compilée, le lanceur, l'icône,
-// README et LICENSE. Pas d'outil PowerShell (memoire/) ni d'outils de télémétrie.
+// Contenu : SC Companion.exe (lanceur, launcher/Launcher.cs compilé ici), node\node.exe (Node officiel, même version
+// que celui qui lance ce script, empreinte vérifiée) et sa licence, le service (src + dépendances de production
+// seulement), l'interface compilée, README et LICENSE. Pas d'outil PowerShell (memoire/) ni d'outils de télémétrie.
+// Le lanceur est aussi copié à la racine du dépôt (ignoré par Git) : il y lance le service avec le Node du PC.
 // Version : celle de interface/package.json (recopiée dans service/package.json).
 import { execFileSync } from 'node:child_process'
 import crypto from 'node:crypto'
@@ -80,7 +82,13 @@ copy('service/src')
 copy('service/package.json')
 copy('service/package-lock.json')
 copy('interface/dist')
-for (const f of ['Lancer.vbs', 'icone.ico', 'LICENSE', 'README.md']) copy(f)
+for (const f of ['icone.ico', 'LICENSE', 'README.md']) copy(f) // icone.ico : aussi l'icône près de l'horloge (tray.ts)
+
+step('Compiling SC Companion.exe')
+const CSC = path.join(process.env.SystemRoot ?? 'C:\\Windows', 'Microsoft.NET', 'Framework64', 'v4.0.30319', 'csc.exe')
+const exe = path.join(app, 'SC Companion.exe')
+run(CSC, ['/nologo', '/target:winexe', '/optimize+', `/win32icon:${path.join(ROOT, 'icone.ico')}`, '/r:System.Windows.Forms.dll', `/out:${exe}`, path.join(ROOT, 'launcher', 'Launcher.cs')])
+fs.copyFileSync(exe, path.join(ROOT, 'SC Companion.exe')) // copie de développement (Node du PC)
 
 step('Installing service dependencies (production only)')
 npm(['ci', '--omit=dev', '--no-audit', '--no-fund'], path.join(app, 'service'))
