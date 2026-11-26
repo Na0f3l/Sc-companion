@@ -1,63 +1,92 @@
 # SC Companion
 
-Compagnon Star Citizen : infos en jeu en temps réel (perso, vaisseau, alertes) à partir de la télémétrie gRPC locale du jeu, et surveillance de la mémoire (détection de fuite). Pensé pour être le plus léger possible en RAM / CPU, et lisible sur PC comme sur téléphone (Wi-Fi local).
+A lightweight companion screen for Star Citizen, for a second monitor, a tablet or your phone.
 
-## Contenu
+- **Live HUD** from the game's local telemetry: character vitals, ship flight data, warning lights, and full-screen alerts with sound.
+- **Memory watch**: Star Citizen's RAM, system memory, CPU and GPU, plus memory-leak detection.
+- **Game.log events**: injuries, deaths, kills, contracts, server changes, and a timeline under the RAM chart.
+- **Session recording**: each play session is saved with its memory curve and events, so you can review it later.
+- **Ship sheets**: speeds, acceleration, fuel and more for any ship.
 
-| Dossier | Rôle |
+Read-only. It never touches the game, its files or its memory, and your data stays on your PC.
+
+> **Telemetry and Star Citizen 5.0.** The live HUD needs the game's telemetry stream. It works on LIVE 4.10, but the 5.0 PTU currently doesn't send telemetry. SC Companion detects this and shows *No telemetry* instead of an endless *Loading*. Memory watch, Game.log events, session recording and ship sheets keep working. The HUD will come back on its own if the game turns telemetry on again.
+
+## Install
+
+1. Download `SC-Companion-<version>-win-x64.zip` from the [Releases](https://github.com/Na0f3l/Sc-companion/releases) page.
+2. Extract it anywhere, for example to `Documents\SC Companion`. Nothing else is needed: Node.js comes with it.
+3. Double-click **`Lancer.vbs`**. The service starts in the background and the companion screen opens in your browser.
+
+An SC Companion icon appears next to the clock. Double-click it to open the screen. Right-click it for Sessions, Mobile connect or **Quit**.
+
+To get a desktop shortcut, right-click `Lancer.vbs` › *Show more options* › *Create shortcut*, then move the shortcut to your desktop. You can give it the `icone.ico` icon in its *Properties*.
+
+**Turn on the game's telemetry (LIVE 4.10).** Set the Windows environment variable `GRPC_CLIENT_SERVER_ENABLED` to `true`: Start › *Edit environment variables for your account* › *New…*. Then restart the RSI Launcher.
+
+**First launch warnings.** The download isn't code-signed, so Windows SmartScreen or your antivirus may warn about it. If Windows Firewall asks about Node.js, allow **Private networks**: you only need that to use the screen on your phone.
+
+### On your phone or tablet
+
+Open **Menu › Mobile connect** on the PC and scan the QR code. The phone must be on the same Wi-Fi network. The code holds a private key, so only devices that scanned it can open the screen. The phone remembers it afterwards. *Having issues?* in that window covers firewall and network settings.
+
+### Game folder
+
+SC Companion finds the game on its own. It uses the folder of the running `StarCitizen.exe` (LIVE, PTU, any drive), otherwise the last launch recorded by the RSI Launcher, otherwise the default install folder. To set it yourself, use **Menu › Game folder › Choose…** and pick `StarCitizen.exe` or `Game.log`. **Auto** goes back to detection.
+
+### Your data
+
+Sessions, settings and updated ship data are kept in `%LOCALAPPDATA%\SC Companion`, along with the service log (`service.log`). To uninstall, quit SC Companion from its icon, then delete its folder and that one.
+
+## Development
+
+Requires Node 24 (TypeScript runs natively, no build step for the service).
+
+| Folder | Role |
 |---|---|
-| `service/` | Service Node 24 (TypeScript exécuté nativement) : lit le flux gRPC du jeu (lecture seule) ou rejoue une capture, diffuse à l'interface par WebSocket (5 Hz max, seules les valeurs modifiées, pause totale sans écran connecté) |
-| `interface/` | Interface Vue 3 + Vite + TypeScript + SCSS : écrans façon HUD (vol, perso, environnement), alertes plein écran avec son |
-| `telemetrie/` | Outils : sonde (`probe`), faux serveur (`fake`), capture brute des champs inconnus (`raw`) |
-| `memoire/` | Outil PowerShell de suivi mémoire / CPU / GPU et de détection de fuite (`memoire/METRIQUES.md`) |
-
-## Lancer
-
-Prérequis : Node 24, et la télémétrie activée côté jeu (LIVE 4.10 : variable d'environnement `GRPC_CLIENT_SERVER_ENABLED=true` avant de lancer le RSI Launcher).
-
-Le schéma de télémétrie n'est pas inclus et n'est pas à télécharger : le service le lit directement dans le jeu installé (`Bin64\StarCitizen.exe` embarque ses descripteurs protobuf), une fois par version du jeu, et le garde en cache dans `%LOCALAPPDATA%\SC Companion`. Il correspond donc toujours à la version installée. Repli possible : un fichier `telemetrie/proto/sc_telemetry.proto` (par ex. celui du projet communautaire [Sokren/sc-telemetry-deck](https://github.com/Sokren/sc-telemetry-deck)), utilisé seulement si l'exe est illisible.
+| `service/` | Node service: reads the game's gRPC telemetry (read-only) or replays a capture, reads Game.log, measures memory / CPU / GPU, records sessions, and serves the interface. Pushes changes to the screens over WebSocket (5 Hz max, only changed values, fully paused when no screen is connected). |
+| `interface/` | Vue 3 + Vite + TypeScript + SCSS: HUD-style screens (flight, character), full-screen alerts with sound. |
+| `scripts/` | `release.mjs`: builds the portable zip. |
+| `telemetrie/` | Tools: probe, fake server, raw capture of unknown fields. |
+| `memoire/` | Standalone PowerShell memory / CPU / GPU tracker with leak detection (not in the release). |
 
 ```
-cd interface && npm install && npm run build   # une fois (et après chaque modification de l'interface)
-cd service   && npm install && node src/index.ts  # puis ouvrir http://localhost:2950 (ou http://<ip-du-pc>:2950 sur le téléphone)
+cd interface && npm install && npm run build   # after every interface change
+cd service   && npm install && node src/index.ts  # then open http://localhost:2950
 ```
 
-Sans terminal : double-clic sur `Lancer.vbs` (ou un raccourci vers `wscript.exe "…\Lancer.vbs"` avec `icone.ico`). Il démarre le service en arrière-plan s'il ne tourne pas déjà, puis ouvre l'interface ; les messages du service vont dans `service/service.log`. Une icône SC Companion apparaît dans la zone de notification (à côté de l'horloge) : double-clic pour ouvrir l'interface, clic droit pour Sessions, Mobile connect ou **Quit** (arrêt du service) ; l'infobulle indique l'état du jeu. `--no-tray` pour s'en passer.
+`Lancer.vbs` also works from the repository: it uses the installed Node when there is no bundled `node\node.exe`. `npm run dev` in `interface/` is only for development: in normal use the service serves the built interface itself (Vite would cost ~500 MB).
 
-Données de l'utilisateur (sessions de jeu, réglages communs, données vaisseaux mises à jour) : `%LOCALAPPDATA%\SC Companion\` (copiées depuis l'ancien `service/data/` au premier lancement). Dossier du jeu : détecté automatiquement, sinon choisi dans le menu (**Game folder**). Il est pris dans cet ordre : celui de `StarCitizen.exe` s'il tourne (LIVE, PTU, autre disque, même lancé sans le launcher), puis celui du dernier lancement noté par le launcher RSI, puis `C:\Program Files\Roberts Space Industries\StarCitizen\LIVE`. **Game folder › Choose…** ouvre sur le PC une fenêtre pour désigner `StarCitizen.exe` ou `Game.log`, et ce choix passe avant la détection ; **Auto** revient à la détection, et `--game-dir <dossier>` passe avant tout. En changeant de dossier (passage LIVE → PTU), le Game.log et le schéma de télémétrie de ce jeu-là sont repris sans relancer le service. Si le service tourne déjà, un second lancement le signale et s'arrête sans rien toucher.
+Service options: `--game-dir <folder>` (forces the game folder), `--port <n>`, `--replay ../telemetrie/captures` (replays captures), `--no-tray`. Start it with `node` directly rather than `npm run`, because npm keeps a ~60 MB parent process alive.
 
-Le service sert lui-même l'interface compilée : pas besoin du serveur de développement Vite pour jouer (~500 Mo économisés). `npm run dev` dans `interface/` ne sert qu'à développer.
+**Release:** set the version in `interface/package.json`, then run `node scripts/release.mjs`. It produces `release/SC-Companion-<version>-win-x64.zip`. The zip contains the official Node.js for the current version (checksum verified) with its license, the service with production dependencies only, the built interface, the launcher, README and LICENSE.
 
-Options du service : `--replay ../telemetrie/captures` (rejeu de captures), `--game-dir <dossier>` (impose le dossier du jeu), `--port <n>`. Le lancer avec `node` directement plutôt que `npm run` (npm garde un processus parent de ~60 Mo).
+**Telemetry schema:** not included and not downloaded. The service extracts it from the installed game (`Bin64\StarCitizen.exe` embeds its protobuf descriptors), once per game version, and caches it in `%LOCALAPPDATA%\SC Companion`, so it always matches the installed version. As a fallback, it uses `telemetrie/proto/sc_telemetry.proto` if present (for example from the community project [Sokren/sc-telemetry-deck](https://github.com/Sokren/sc-telemetry-deck)), only when the executable can't be read.
 
-Empreinte mesurée : ~59 Mo de mémoire privée, ~1 % d'un cœur CPU, ~0,3 Ko/s par écran.
+**Mobile access:** the PC always has access. Other devices need the key from the Mobile connect QR code (`?k=…`), which is then kept in a cookie (`service/src/access.ts`). It's deliberately light protection: the service can't control the game and knows no credentials.
 
-Suivi mémoire : double-clic sur `memoire/app/Lancer.vbs`.
+Measured footprint: ~59 MB private memory, ~1 % of one CPU core, ~0.3 KB/s per screen.
 
-## Ce que le jeu envoie (LIVE 4.10)
+### What the game sends (LIVE 4.10)
 
-Reçu : santé, faim, soif, température, cardio, O₂, environnement, solde, vitesse, H-Fuel, boost, G (valeur totale), altitude radar, cap, vitesse verticale, voyants d'alerte, train, IFCS, alimentation, armes, contre-mesures.
+**Received:** health, hunger, thirst, temperature, heart rate, O₂, environment, balance, speed, H-fuel, boost, G (total), radar altitude, heading, vertical speed, warning lights, landing gear, IFCS, power, weapons, countermeasures.
 
-Prévu par le schéma mais jamais envoyé : Q-Fuel, coque, boucliers, mode de vol, événements, retour de force. Aucun vecteur de déplacement : pas de marche arrière, de dérive ni de G par axe. Vérifiable après une mise à jour du jeu avec `npm run raw` dans `telemetrie/`.
+**In the schema but never sent:** Q-fuel, hull, shields, flight mode, events, force feedback. No motion vectors either, so there's no reverse, drift or per-axis G. After a game update, you can check this with `npm run raw` in `telemetrie/`.
 
-## Crédits
+## Credits
 
-Sons d'alerte (`interface/public/sounds/`) :
+Alert sounds (`interface/public/sounds/`):
 
-- alerte rouge : « warning » de **Lyubomir Ikonomov** ([Freesound 787777](https://freesound.org/s/787777/)), libre d'utilisation ;
-- alerte orange : « Mechanical gas release alert » ([Mixkit](https://mixkit.co/)).
+- red alert: "warning" by **Lyubomir Ikonomov** ([Freesound 787777](https://freesound.org/s/787777/)), free to use;
+- amber alert: "Mechanical gas release alert" ([Mixkit](https://mixkit.co/)).
 
-Données des vaisseaux (`interface/public/data/`, régénérées par `npm run ships` dans `service/` ; quand le wiki annonce une nouvelle version du jeu, le bouton « Update ship data » de l'interface les met à jour sans rebuild) :
+Ship data (`interface/public/data/`, regenerated with `npm run ships` in `service/`; when the wiki announces a new game version, the interface's "Update ship data" button refreshes it without a rebuild):
 
-- noms, vitesses, rotations, carburant : [API du Star Citizen Wiki](https://api.star-citizen.wiki) ;
-- accélérations en G mesurées en jeu : données communautaires de [SPViewer](https://www.spviewer.eu).
+- names, speeds, rotation, fuel: [Star Citizen Wiki API](https://api.star-citizen.wiki);
+- acceleration in G measured in game: community data from [SPViewer](https://www.spviewer.eu).
 
-## Avertissement
+## License
 
-Projet personnel, non affilié à Cloud Imperium Games. Le service est en lecture seule : il n'envoie aucune commande au jeu.
+SC Companion is free and open source, under the MIT License (see `LICENSE`). Third-party material (sounds, fonts, ship data, telemetry schema, bundled Node.js) keeps its own license: see Credits above and the About window in the app.
 
-## Licence
-
-SC Companion est libre et open source, sous licence MIT (voir `LICENSE`). Les contenus tiers (sons, polices, données des vaisseaux, schéma de télémétrie) gardent leur propre licence : voir « Crédits » ci-dessus et la fenêtre « About » de l'interface.
-
-Projet de fan non officiel, sans lien avec Cloud Imperium Games. Star Citizen®, Roberts Space Industries® et Cloud Imperium® sont des marques de Cloud Imperium Rights LLC.
+Unofficial fan project, not affiliated with or endorsed by Cloud Imperium Games. Star Citizen®, Roberts Space Industries® and Cloud Imperium® are trademarks of Cloud Imperium Rights LLC.

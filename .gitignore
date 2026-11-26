@@ -25,3 +25,6 @@ desktop.ini
 
 # --- Sons d'origine (Mixkit) : seules les versions coupées de interface/public/sounds sont publiées ---
 /sounds/
+
+# --- Version publiée (scripts/release.mjs) ---
+release/

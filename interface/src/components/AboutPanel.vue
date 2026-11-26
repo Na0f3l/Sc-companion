@@ -14,6 +14,7 @@ function onClick(e: MouseEvent): void {
 }
 
 const REPO = 'https://github.com/Na0f3l/Sc-companion'
+const VERSION = __APP_VERSION__
 
 const CREDITS = [
   { what: 'Telemetry schema', who: 'Sokren — sc-telemetry-deck', url: 'https://github.com/Sokren/sc-telemetry-deck', note: 'pioneering work on the game\'s telemetry interface (the schema itself is read from your game install)' },
@@ -38,7 +39,7 @@ const LIBS = [
   <dialog ref="dlg" class="box" aria-labelledby="ab-title" @click="onClick">
     <div class="frame">
     <header>
-      <h2 id="ab-title">About SC Companion</h2>
+      <h2 id="ab-title">About SC Companion <small class="ver">v{{ VERSION }}</small></h2>
       <button type="button" class="x" aria-label="Close" @click="dlg?.close()">✕</button>
     </header>
 
@@ -142,6 +143,12 @@ h2 {
   @include label;
   color: var(--cyan);
   font-size: 12px;
+
+  .ver {
+    margin-left: 6px;
+    color: var(--muted);
+    font-size: 10px;
+  }
 }
 
 h3 {
