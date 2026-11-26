@@ -2,6 +2,14 @@
 
 A lightweight companion screen for Star Citizen, for a second monitor, a tablet or your phone.
 
+![Ship screen](docs/ship.png)
+
+| Character screen | Full-screen alert |
+| --- | --- |
+| ![Character screen](docs/player.png) | ![Crash imminent alert](docs/ship-alert.png) |
+
+<sub>Screenshots taken in preview mode (sample data).</sub>
+
 - **Live HUD** from the game's local telemetry: character vitals, ship flight data, warning lights, and full-screen alerts with sound.
 - **Memory watch**: Star Citizen's RAM, system memory, CPU and GPU, plus memory-leak detection.
 - **Game.log events**: injuries, deaths, kills, contracts, server changes, and a timeline under the RAM chart.
