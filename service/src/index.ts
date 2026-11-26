@@ -3,9 +3,10 @@
 //   npm run replay                       rejoue telemetrie/captures
 //   node src/index.ts --replay <fichier|dossier> [--port 2950]
 //
+// Accès : le PC toujours ; un autre appareil après avoir scanné le QR code de Mobile connect (jeton, access.ts).
 // HTTP  GET /        → interface compilée (interface/dist), à ouvrir sur PC ou téléphone
 //       GET /health  → état du service et sa mémoire (pour surveiller l'empreinte)
-//       GET /lan     → adresses du PC sur le réseau local (QR code « Mobile connect » de l'interface)
+//       GET /lan     → adresses du PC sur le réseau local, avec le jeton (QR code « Mobile connect » de l'interface)
 //       GET /history → mémoire de SC sur les 2 dernières heures (courbe zoomable de la bande RAM)
 //       GET /sessions            → sessions de jeu enregistrées (résumés, la plus récente d'abord)
 //       GET /sessions/<id>       → une session complète (mesures + événements)
@@ -29,6 +30,7 @@ import { configFlat, setGameDir, updateConfig } from './config.ts'
 import { createSessionRecorder } from './sessions.ts'
 import { gameDir, setForcedGameDir, setRunningGameDir } from './paths.ts'
 import { pickGameFile } from './picker.ts'
+import { TOKEN, allowed, checkAccess } from './access.ts'
 import { createTray, openUrl } from './tray.ts'
 import { hasInterface, serveStatic } from './static.ts'
 import { checkLatest, serveData } from './shipdata.ts'
@@ -177,6 +179,7 @@ function serveSessions(req: http.IncomingMessage, res: http.ServerResponse): boo
 }
 
 const server = http.createServer((req, res) => {
+  if (!checkAccess(req, res)) return // autre appareil sans le jeton du QR code
   if (req.url === '/health') {
     const mem = process.memoryUsage()
     res.writeHead(200, { 'content-type': 'application/json' })
@@ -198,7 +201,7 @@ const server = http.createServer((req, res) => {
   if (serveSessions(req, res)) return
   if (req.url === '/lan') {
     res.writeHead(200, { 'content-type': 'application/json', 'cache-control': 'no-store' })
-    res.end(JSON.stringify({ port: PORT, urls: lanUrls() }))
+    res.end(JSON.stringify({ port: PORT, urls: lanUrls().map((u) => `${u}/?k=${TOKEN}`) }))
     return
   }
   if (serveData(req, res)) return // données vaisseaux (avant l'interface : la copie à jour est prioritaire)
@@ -206,7 +209,7 @@ const server = http.createServer((req, res) => {
   res.writeHead(404).end()
 })
 
-const wss = new WebSocketServer({ server, path: '/ws', perMessageDeflate: false }) // compression inutile en local : du CPU pour rien
+const wss = new WebSocketServer({ server, path: '/ws', perMessageDeflate: false, verifyClient: ({ req }: { req: http.IncomingMessage }) => allowed(req) }) // compression inutile en local : du CPU pour rien
 
 wss.on('connection', (ws) => {
   clients.add(ws)

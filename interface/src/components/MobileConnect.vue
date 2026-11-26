@@ -58,6 +58,8 @@ function onClick(e: MouseEvent): void {
 }
 
 const PORT = location.port || '2950'
+// adresse sans le jeton d'accès (?k=…, service/src/access.ts) : il est dans le QR code, inutile de l'afficher
+const bare = (u: string) => u.replace(/\/?\?k=.*$/, '')
 </script>
 
 <template>
@@ -77,12 +79,13 @@ const PORT = location.port || '2950'
           <rect x="-3" y="-3" :width="qr.size + 6" :height="qr.size + 6" fill="#fff" />
           <path :d="qr.path" fill="#000" />
         </svg>
-        <p class="url">{{ url }}</p>
+        <p class="url">{{ bare(url) }}</p>
+        <p class="lead">The code holds a private key: only devices that scanned it can open this screen.</p>
         <!-- plusieurs cartes réseau (Ethernet + Wi-Fi, VPN…) : choisir celle du réseau du téléphone -->
         <label v-if="urls.length > 1" class="pick">
           <span>Network address</span>
           <select v-model="url" @change="draw">
-            <option v-for="u in urls" :key="u" :value="u">{{ u }}</option>
+            <option v-for="u in urls" :key="u" :value="u">{{ bare(u) }}</option>
           </select>
         </label>
       </template>
