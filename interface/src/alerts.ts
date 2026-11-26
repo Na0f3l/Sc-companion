@@ -64,7 +64,8 @@ function lowVital(name: string, on = 0.25, off = 0.3): () => boolean {
     const k = `${ACT}vitals.${name}.current`
     // le jeu n'envoie pas les valeurs nulles : valeur absente mais maximum présent = 0 (ex. vie à 0 dans le coma)
     if (!has(k) && !has(`${ACT}vitals.${name}.max`)) return (low = false)
-    const ratio = num(k) / (num(`${ACT}vitals.${name}.max`, 100) || 100)
+    // santé sur 100 comme dans le jeu (la vie max baisse avec les blessures) ; faim et soif sur leur maximum
+    const ratio = num(k) / (name === 'health' ? 100 : num(`${ACT}vitals.${name}.max`, 100) || 100)
     const falling = prev === null || ratio < prev
     low = low ? ratio < off : ratio < on && falling
     prev = ratio

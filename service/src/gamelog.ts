@@ -312,6 +312,7 @@ export function createGameLogReader(gameDir: () => string, onEvent?: (e: LogEven
     if (size < pos) { pos = 0; rest = ''; mode = null; loaded = false; injuries.clear(); events = []; dirty = true; me = { id: '', name: '' }; wrecks.clear(); pendingKills = []; downedAt = null; myItems.clear() } // nouveau fichier (jeu relancé)
     if (size === pos) { flushKills(); pruneEvents(); return }
     if (pos === 0) {
+      carryOverInjuries()
       grpcEnv = null
       headerFromStart = size <= MAX_FIRST_READ
       if (size > MAX_FIRST_READ) pos = size - MAX_FIRST_READ // premier passage : la fin suffit (en-tête non lu)
@@ -333,6 +334,57 @@ export function createGameLogReader(gameDir: () => string, onEvent?: (e: LogEven
     pruneEvents()
   }
 
+  // Les blessures durent d'une session à l'autre, mais le Game.log repart de zéro à chaque lancement : on relit
+  // blessures et soins dans les derniers logs archivés (logbackups, du plus ancien au plus récent). Elles sont
+  // datées de 0 : la vie max revenue à 100 (clearInjuries, soin au medpen non noté dans le log) les efface.
+  function carryOverInjuries(): void {
+    const dir = path.join(path.dirname(file), 'logbackups')
+    let logs: { f: string; t: number }[]
+    try {
+      logs = fs.readdirSync(dir).filter((f) => f.endsWith('.log'))
+        .map((f) => ({ f: path.join(dir, f), t: fs.statSync(path.join(dir, f)).mtimeMs }))
+        .sort((a, b) => a.t - b.t).slice(-3)
+    } catch {
+      return // pas d'archives
+    }
+    for (const { f } of logs) {
+      let fd: number
+      try { fd = fs.openSync(f, 'r') } catch { continue }
+      try {
+        const size = fs.fstatSync(fd).size
+        let at = 0, tail = ''
+        while (at < size) {
+          const end = Math.min(size, at + CHUNK)
+          const text = tail + readChunk(fd, at, end)
+          at = end
+          const cut = text.lastIndexOf('\n')
+          tail = cut >= 0 ? text.slice(cut + 1) : text
+          if (cut >= 0) applyInjuries(text.slice(0, cut), 0)
+        }
+        applyInjuries(tail, 0)
+      } finally {
+        fs.closeSync(fd)
+      }
+    }
+  }
+
+  // blessures et soins dans l'ordre du log : une blessure soignée puis reprise reste affichée
+  function applyInjuries(lines: string, at: number): void {
+    const changes: [number, () => void][] = []
+    INJURY_RX.lastIndex = 0
+    for (let m = INJURY_RX.exec(lines); m; m = INJURY_RX.exec(lines)) {
+      const part = PART_KEY[m[1]!]!
+      const tier = Number(m[2])
+      changes.push([m.index, () => injuries.set(part, { tier, at })])
+    }
+    MEDBED_RX.lastIndex = 0
+    for (let m = MEDBED_RX.exec(lines); m; m = MEDBED_RX.exec(lines)) {
+      const healed = MEDBED_PARTS.filter((_, i) => m![i + 1] === 'true')
+      changes.push([m.index, () => healed.forEach((p) => injuries.delete(p))])
+    }
+    changes.sort((a, b) => a[0] - b[0]).forEach(([, apply]) => apply())
+  }
+
   // Un bloc de lignes complètes : mode de jeu, blessures et soins, événements
   function readLines(lines: string): void {
     const found = lastMode(lines)
@@ -347,20 +399,7 @@ export function createGameLogReader(gameDir: () => string, onEvent?: (e: LogEven
         headerFromStart = false
       }
     }
-    // blessures et soins dans l'ordre du log : une blessure soignée puis reprise reste affichée
-    const changes: [number, () => void][] = []
-    INJURY_RX.lastIndex = 0
-    for (let m = INJURY_RX.exec(lines); m; m = INJURY_RX.exec(lines)) {
-      const part = PART_KEY[m[1]!]!
-      const tier = Number(m[2])
-      changes.push([m.index, () => injuries.set(part, { tier, at: Date.now() })])
-    }
-    MEDBED_RX.lastIndex = 0
-    for (let m = MEDBED_RX.exec(lines); m; m = MEDBED_RX.exec(lines)) {
-      const healed = MEDBED_PARTS.filter((_, i) => m![i + 1] === 'true')
-      changes.push([m.index, () => healed.forEach((p) => injuries.delete(p))])
-    }
-    changes.sort((a, b) => a[0] - b[0]).forEach(([, apply]) => apply())
+    applyInjuries(lines, Date.now())
     readEvents(lines)
   }
 
@@ -409,6 +448,8 @@ export function createGameLogReader(gameDir: () => string, onEvent?: (e: LogEven
     seatEvent(seated: boolean, cls: string): void {
       addEvent(Date.now(), seated ? 'board' : 'exit', seatLabel(seated, cls))
     },
+    /** Chargé en partie (PU / AC) ? null si le Game.log n'a rien donné (introuvable, jeu pas lancé). */
+    inGame: (): boolean | null => (mode === null ? null : loaded),
     flat: (): Flat => {
       const out: Flat = mode ? { 'game.mode': mode } : {}
       if (loaded) out['game.loaded'] = true

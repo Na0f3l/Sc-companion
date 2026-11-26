@@ -72,7 +72,7 @@ const system = createSystemMonitor((s) => {
     const frame = source.latest()
     if (frame) observe(flatten(frame))
   }
-}) // mémoire SC / système, CPU, GPU, fuite
+}, () => gameLog.inGame()) // mémoire SC / système, CPU, GPU, fuite (écoutée seulement en partie, jeu stabilisé)
 const gameLog = createGameLogReader(gameDir, (e) => sessions.onEvent(e)) // mode de jeu, blessures, événements
 
 // ---- Diffusion ------------------------------------------------------------------

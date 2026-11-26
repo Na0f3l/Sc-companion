@@ -11,9 +11,13 @@ const props = withDefaults(
     alert?: 'low' | 'high' | 'none'
     warnAt?: number // seuil orange (sous ce seuil en mode low, au-dessus en mode high)
     critAt?: number // seuil rouge
+    cap?: number // 0 → 1 : maximum atteignable (vie max baissée par les blessures), le reste est barré
   }>(),
-  { alert: 'low', warnAt: undefined, critAt: undefined },
+  { alert: 'low', warnAt: undefined, critAt: undefined, cap: 1 },
 )
+// part inatteignable, de cap à 100 % : trait nul, espace jusqu'à cap, trait jusqu'au bout
+const capPct = computed(() => Math.round(Math.min(1, Math.max(0, props.cap)) * 100))
+const lostDash = computed(() => `0 ${capPct.value} ${100 - capPct.value} 100`)
 
 // Arrondi vers le bas, comme le jeu (82,86 → 82 en jeu, pas 83). Le 1e-6 évite qu'une valeur
 // exacte mal représentée en flottant (0,82 × 100 = 81,999…) tombe à l'entier du dessous.
@@ -40,6 +44,7 @@ const level = computed(() => {
     <svg viewBox="0 0 64 64" aria-hidden="true">
       <circle class="track" cx="32" cy="32" r="26" />
       <!-- pathLength=100 : la longueur de l'anneau vaut 100, donc dasharray = pourcentage -->
+      <circle v-if="capPct < 100" class="lost" cx="32" cy="32" r="26" pathLength="100" :stroke-dasharray="lostDash" />
       <circle class="fill" cx="32" cy="32" r="26" pathLength="100" :stroke-dasharray="dash" />
       <line class="tick" x1="32" y1="3" x2="32" y2="9" />
       <g class="icon">
@@ -93,6 +98,14 @@ circle {
 
 .track {
   stroke: var(--off);
+}
+
+// vie max perdue (blessures) : rouge sombre, comme la jauge du jeu
+.lost {
+  stroke: var(--red);
+  stroke-opacity: 0.35;
+  transform: rotate(-90deg);
+  transform-origin: 32px 32px;
 }
 
 .fill {

@@ -54,7 +54,7 @@ const pctTone = computed(() => (commit.value >= ram.critPct ? 'crit' : commit.va
 const leakTone = computed(() => (leak.value === 'leak' ? 'crit' : leak.value === 'rising' ? 'warn' : ''))
 
 const LEAK_LABEL: Record<string, string> = {
-  startup: 'GAME LOADING',
+  startup: 'STANDBY', // détection en veille : menu, chargement ou mémoire pas encore stabilisée
   stable: 'STABLE',
   rising: 'RISING FAST',
   leak: 'LEAK',

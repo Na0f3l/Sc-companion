@@ -5,7 +5,7 @@
 // Source : notifications « Injury Detected » du Game.log, lues par le service (injury.<partie> = tier).
 // SVG pur, tracés calculés une seule fois au chargement : aucun coût à l'exécution.
 import { computed } from 'vue'
-import { has, num } from '@/telemetry'
+import { ACT, has, num } from '@/telemetry'
 
 // Grille 120 × 240, personnage vu de face : son côté droit est à gauche de l'écran.
 // Le côté gauche est obtenu par symétrie (x → 120 − x) ; tracés en coordonnées absolues uniquement.
@@ -92,6 +92,9 @@ const PARTS: Part[] = [
 const tier = (p: Part): number | null => (has(`injury.${p.key}`) ? num(`injury.${p.key}`) : null)
 const injured = computed(() => PARTS.filter((p) => tier(p) !== null))
 const TIER_NAME: Record<number, string> = { 1: 'Severe', 2: 'Moderate', 3: 'Minor' }
+// Vie max baissée sans blessure connue : blessure d'une session dont le log n'existe plus (partie inconnue)
+const maxHealth = computed(() => (has(`${ACT}vitals.health.max`) ? num(`${ACT}vitals.health.max`) : 100))
+const untracked = computed(() => !injured.value.length && maxHealth.value < 99.9)
 </script>
 
 <template>
@@ -107,7 +110,10 @@ const TIER_NAME: Record<number, string> = { 1: 'Severe', 2: 'Moderate', 3: 'Mino
       </g>
     </svg>
     <ul class="list">
-      <li v-if="!injured.length" class="none">No injury</li>
+      <li v-if="untracked" class="t3">
+        <span>Untracked injury</span><b>Max health {{ Math.floor(maxHealth) }}%</b>
+      </li>
+      <li v-else-if="!injured.length" class="none">No injury</li>
       <li v-for="p in injured" :key="p.key" :class="`t${tier(p)}`">
         <span>{{ p.label }}</span><b>{{ TIER_NAME[tier(p)!] }} · T{{ tier(p) }}</b>
       </li>

@@ -10,7 +10,10 @@ defineProps<{ compact?: boolean }>()
 
 const V = `${ACT}vitals.`
 const ratio = (k: string) => num(V + k + '.current') / (num(V + k + '.max', 100) || 100)
-const health = computed(() => ratio('health'))
+// Santé sur 100 comme dans le jeu : une blessure baisse la vie max (ex. 86), la vie pleine affiche alors 86 %.
+// La part perdue (max → 100) est dessinée à part sur l'anneau.
+const health = computed(() => num(V + 'health.current') / 100)
+const healthCap = computed(() => Math.min(1, num(V + 'health.max', 100) / 100))
 const hunger = computed(() => ratio('hunger'))
 const thirst = computed(() => ratio('thirst'))
 const WARN = 0.5
@@ -19,7 +22,7 @@ const CRIT = 0.25
 
 <template>
   <div class="rings" :class="{ compact }">
-    <RingGauge :value="health" icon="health" label="Health" :warn-at="WARN" :crit-at="CRIT" />
+    <RingGauge :value="health" :cap="healthCap" icon="health" label="Health" :warn-at="WARN" :crit-at="CRIT" />
     <RingGauge :value="hunger" icon="hunger" label="Hunger" :warn-at="WARN" :crit-at="CRIT" />
     <RingGauge :value="thirst" icon="thirst" label="Thirst" :warn-at="WARN" :crit-at="CRIT" />
   </div>

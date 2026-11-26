@@ -19,7 +19,8 @@ import { config } from './config.ts'
 // les chargements (détectés dans le Game.log) ; ici on exige directement 45 s par défaut :
 // un chargement (150 à 300 Mo/s pendant 15 à 45 s) ne déclenche pas d'alerte.
 const CALM_AFTER = 60 // s de calme (pente 30 s < seuil / 3) pour clore un épisode
-const STARTUP = 180 // s : pas de détection pendant le chargement initial du jeu
+const STARTUP = 180 // s : sans Game.log lisible, pas de détection pendant le chargement initial du jeu
+const SETTLE = 60 // s : en partie, mémoire calme (pente 30 s < seuil / 3) pendant ce temps avant d'écouter
 const LONG_POINTS = 3600 // historique long : 2 h à une mesure toutes les 2 s
 const SAMPLE_MS = 2000 // comme l'outil PowerShell : assez pour la pente 15 s et la variation sur 5 s
 const SC_EXE = 'starcitizen.exe'
@@ -219,7 +220,12 @@ export interface Sample {
   leak: LeakState | null
 }
 
-export function createSystemMonitor(onSample?: (s: Sample) => void) {
+/**
+ * inGame : d'après le Game.log, true = chargé en partie (PU / AC), false = menu ou chargement,
+ * null = inconnu (log illisible). La détection de fuite n'écoute qu'en partie, une fois la mémoire stabilisée :
+ * la montée rapide du lancement et des chargements n'est pas une fuite.
+ */
+export function createSystemMonitor(onSample?: (s: Sample) => void, inGame?: () => boolean | null) {
   // Mesure GPU : seulement quand un écran l'affiche (setGpu, index.ts) ; les compteurs de performance Windows
   // coûtent ~23 Mo, inutiles pour enregistrer une session sans écran
   let gpu: Gpu | null = null
@@ -237,6 +243,8 @@ export function createSystemMonitor(onSample?: (s: Sample) => void) {
   let leak: { onsetMb: number; calmSince: number | null } | null = null
   let scCreated = 0
   let scDir: string | null = null
+  let settledSince: number | null = null // début du calme en partie
+  let armed = false // jeu chargé et mémoire stabilisée : détection active
 
   function cpuPct(): number | null {
     const i = { lo: 0, hi: 0 }, k = { lo: 0, hi: 0 }, u = { lo: 0, hi: 0 }
@@ -275,9 +283,9 @@ export function createSystemMonitor(onSample?: (s: Sample) => void) {
     // ---- Star Citizen + détection de fuite (logique de l'outil PowerShell) ----
     const sc = readStarCitizen()
     if (!sc) {
-      hist.length = 0; hotSince = null; leak = null; scCreated = 0; scDir = null
+      hist.length = 0; hotSince = null; leak = null; scCreated = 0; scDir = null; settledSince = null; armed = false
     } else {
-      if (sc.created !== scCreated) { hist.length = 0; hotSince = null; leak = null; scCreated = sc.created; scDir = gameDirOf(sc.pid) } // jeu (re)lancé
+      if (sc.created !== scCreated) { hist.length = 0; hotSince = null; leak = null; scCreated = sc.created; scDir = gameDirOf(sc.pid); settledSince = null; armed = false } // jeu (re)lancé
       const mb = sc.privateBytes / 2 ** 20
       hist.push({ t: now, mb })
       longT.push(Math.round(now))
@@ -287,7 +295,19 @@ export function createSystemMonitor(onSample?: (s: Sample) => void) {
 
       const s15 = slope(hist, 15)
       const s30 = slope(hist, 30)
-      const startup = Date.now() - fileTimeToMs(sc.created) < STARTUP * 1000
+      const ig = inGame?.() ?? null
+      if (ig === null) { // pas de Game.log : ancien délai fixe après le lancement
+        armed = Date.now() - fileTimeToMs(sc.created) >= STARTUP * 1000
+        settledSince = null
+      } else if (!ig) { // menu / chargement : on attendra de nouveau la stabilisation
+        armed = false
+        settledSince = null
+      } else if (!armed) {
+        const calm = s30 !== null && s30 < config.leakRate / 3
+        settledSince = calm ? (settledSince ?? now) : null
+        if (settledSince !== null && now - settledSince >= SETTLE) armed = true
+      }
+      const startup = !armed
       const hot = s15 !== null && s15 >= config.leakRate
       hotSince = hot && !startup ? (hotSince ?? now) : null
 
