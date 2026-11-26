@@ -61,6 +61,12 @@ function lowVital(name: string, on = 0.25, off = 0.3): () => boolean {
   let low = false
   let prev: number | null = null
   return () => {
+    // jeu fermé, au menu ou personnage pas encore là : restes de la partie précédente, rien à surveiller ;
+    // on repart de zéro pour ne pas prendre l'arrivée en jeu pour une chute
+    if (!has('sc.private_mb') || str('game.mode') === 'menu' || !has(`${ACT}state.locomotion`)) {
+      prev = null
+      return (low = false)
+    }
     const k = `${ACT}vitals.${name}.current`
     // le jeu n'envoie pas les valeurs nulles : valeur absente mais maximum présent = 0 (ex. vie à 0 dans le coma)
     if (!has(k) && !has(`${ACT}vitals.${name}.max`)) return (low = false)

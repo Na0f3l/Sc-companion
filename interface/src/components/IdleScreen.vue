@@ -2,8 +2,9 @@
 // Écran d'attente (service injoignable, jeu non lancé, menu, chargement), dans le style des MFD.
 // Un emblème façon radar : anneaux et graduations peints une fois, seul le balayage tourne
 // (transform, géré par la carte graphique).
-import { computed } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { tm } from '@/telemetry'
+import { hud, startRockfield } from '@/rockfield'
 import TelemetryHint from './TelemetryHint.vue'
 
 export type IdleKind = 'link' | 'offline' | 'menu' | 'loading' | 'notelemetry'
@@ -63,11 +64,32 @@ const ticks = Array.from({ length: 36 }, (_, i) => {
   const r1 = i % 3 === 0 ? 84 : 88
   return { x1: 100 + r1 * Math.sin(a), y1: 100 - r1 * Math.cos(a), x2: 100 + 92 * Math.sin(a), y2: 100 - 92 * Math.cos(a), major: i % 3 === 0 }
 })
+
+// Mini-jeu en fond : le radar (cercle extérieur, r = 92 sur 200) et les 3 blocs de texte (titre,
+// explications, bouton + score) sont des obstacles, chacun ajusté à son contenu
+const canvas = ref<HTMLCanvasElement>()
+const emblem = ref<SVGSVGElement>()
+const block1 = ref<HTMLElement>()
+const block2 = ref<HTMLElement>()
+const block3 = ref<HTMLElement>()
+let stop: (() => void) | undefined
+onMounted(() => {
+  stop = startRockfield(canvas.value!, () => {
+    const e = emblem.value?.getBoundingClientRect()
+    const rects = [block1, block2, block3].map((b) => b.value?.getBoundingClientRect()).filter((t): t is DOMRect => !!t?.width)
+    return {
+      circle: e && e.width ? { x: e.left + e.width / 2, y: e.top + e.height / 2, r: (e.width * 92) / 200 } : null,
+      rects: rects.map((t) => ({ l: t.left, t: t.top, r: t.right, b: t.bottom })),
+    }
+  })
+})
+onBeforeUnmount(() => stop?.())
 </script>
 
 <template>
   <section class="idle" :class="`is-${kind}`">
-    <svg class="emblem" viewBox="0 0 200 200" aria-hidden="true">
+    <canvas ref="canvas" class="field" aria-hidden="true" />
+    <svg ref="emblem" class="emblem" viewBox="0 0 200 200" aria-hidden="true">
       <g class="static">
         <circle cx="100" cy="100" r="92" />
         <circle cx="100" cy="100" r="64" />
@@ -86,14 +108,32 @@ const ticks = Array.from({ length: 36 }, (_, i) => {
     </svg>
 
     <div class="text">
-      <span class="code">{{ t.code }}</span>
-      <h2>{{ t.title }}</h2>
-      <p class="sub">{{ t.sub }}</p>
-      <p class="hint">{{ t.hint }}</p>
-      <!-- télémétrie du jeu éteinte sur le PC, ou à relancer : bouton et consignes -->
-      <TelemetryHint v-if="kind !== 'link'" :running="kind !== 'offline'" />
-      <!-- voir les écrans sans le jeu : visiteurs, ou développement sans lancer SC -->
-      <button type="button" class="demo" @click="$emit('demo')">Preview mode<span>See the screens with sample data</span></button>
+      <div ref="block1" class="block">
+        <span class="code">{{ t.code }}</span>
+        <h2>{{ t.title }}</h2>
+      </div>
+      <div ref="block2" class="block">
+        <p class="sub">{{ t.sub }}</p>
+        <p class="hint">{{ t.hint }}</p>
+        <!-- télémétrie du jeu éteinte sur le PC, ou à relancer : bouton et consignes -->
+        <TelemetryHint v-if="kind !== 'link'" :running="kind !== 'offline'" />
+      </div>
+      <div ref="block3" class="block">
+        <!-- voir les écrans sans le jeu : visiteurs, ou développement sans lancer SC -->
+        <button type="button" class="demo" @click="$emit('demo')">Preview mode<span>See the screens with sample data</span></button>
+        <!-- mini-jeu : vies (cœurs pleins puis vidés, largeur fixe), score, meilleur score ; consignes en démo -->
+        <p class="game">
+          <template v-if="hud.playing">
+            <span class="hearts" :aria-label="`${hud.lives} lives`">
+              <svg v-for="i in 3" :key="i" viewBox="0 0 16 14" :class="{ full: i <= hud.lives }" aria-hidden="true">
+                <path d="M8 13 1.6 6.7A3.6 3.6 0 0 1 8 2.4a3.6 3.6 0 0 1 6.4 4.3z" />
+              </svg>
+            </span>
+            · Score <b>{{ hud.score }}</b> · Best {{ hud.best }}<template v-if="hud.over"> · Game over</template>
+          </template>
+          <template v-else>Bored? Arrows or WASD to fly, Shift to boost, Space to fire<template v-if="hud.best"> · Best {{ hud.best }}</template></template>
+        </p>
+      </div>
     </div>
   </section>
 </template>
@@ -115,6 +155,30 @@ const ticks = Array.from({ length: 36 }, (_, i) => {
   &.is-link,
   &.is-notelemetry {
     --c: var(--amber);
+  }
+}
+
+.field {
+  // fond fixe derrière toute la page, ne capte pas les clics
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  width: 100vw;
+  height: 100vh;
+  pointer-events: none;
+}
+
+.game {
+  @include numeric;
+  margin: 8px 0 0;
+  color: var(--muted);
+  font-size: 10px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+
+  b {
+    color: var(--amber);
+    font-weight: 600;
   }
 }
 
@@ -176,7 +240,36 @@ const ticks = Array.from({ length: 36 }, (_, i) => {
 .text {
   display: grid;
   gap: 6px;
+}
+
+// chaque bloc prend la largeur de son contenu (ce sont les obstacles du mini-jeu) ; le texte courant est
+// limité à 36ch, le titre non (sinon il passe à la ligne et sa boîte prend toute la largeur)
+.block {
+  display: grid;
+  gap: 6px;
+  justify-self: start;
   max-width: 36ch;
+
+  &:first-child {
+    max-width: none;
+  }}
+
+.hearts {
+  display: inline-flex;
+  gap: 3px;
+  vertical-align: -1px;
+
+  svg {
+    width: 12px;
+    height: 11px;
+    fill: none;
+    stroke: var(--amber);
+    stroke-width: 1.4;
+  }
+
+  .full {
+    fill: var(--amber);
+  }
 }
 
 .code {
@@ -186,9 +279,16 @@ const ticks = Array.from({ length: 36 }, (_, i) => {
   letter-spacing: 0.3em;
 }
 
+// « MAIN MENU » toujours sur deux lignes : bloc étroit, zone de collision du mini-jeu compacte
+.is-menu h2 {
+  width: min-content;
+  white-space: normal;
+}
+
 h2 {
   @include numeric;
   margin: 0;
+  white-space: nowrap;
   color: var(--c);
   font-size: clamp(28px, 6vw, 44px);
   font-weight: 600;

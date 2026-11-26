@@ -73,7 +73,10 @@ function pickTab(view: 'foot' | 'ship'): void {
 }
 const soundLabel = computed(() => (!soundOn.value ? 'Sound off' : soundUnlocked.value ? 'Sound on' : 'Click to enable sound'))
 const IDLE_LABEL: Record<string, string> = { link: 'No link', offline: 'Game not running', menu: 'Main menu', loading: 'Loading', notelemetry: 'No telemetry' }
-const idle = computed(() => (ctx.value === 'vol' || ctx.value === 'pied' ? null : ctx.value))
+// ?rocks : garde l'écran d'attente (et son mini-jeu) même en partie, pour y jouer sur un autre appareil.
+// L'en-tête continue d'afficher l'état réel du jeu.
+const rocks = new URLSearchParams(location.search).has('rocks')
+const idle = computed(() => (ctx.value === 'vol' || ctx.value === 'pied' ? (rocks && !demo.value ? 'menu' : null) : ctx.value))
 const shipClass = computed(() => str(`${VEH}class_name`))
 const ship = computed(() => shipName(shipClass.value))
 // cadre du contexte dans l'en-tête : cliqué aux commandes, il ouvre la fiche du vaisseau (ShipInfo)
@@ -179,15 +182,18 @@ const TABS = [
 
     <!-- Transition : l'ancien écran s'efface, le nouveau apparaît (opacity uniquement) -->
     <Transition name="swap" mode="out-in">
-      <FlightView v-if="ctx === 'vol'" />
+      <IdleScreen v-if="idle" :key="idle" :kind="idle" @demo="showDemo('ship')" />
+      <FlightView v-else-if="ctx === 'vol'" />
       <FootView v-else-if="ctx === 'pied'" />
-      <IdleScreen v-else-if="idle" :key="idle" :kind="idle" @demo="showDemo('ship')" />
     </Transition>
   </main>
 </template>
 
 <style scoped lang="scss">
 .page {
+  // contexte d'empilement propre : le fond animé de l'écran d'attente (canvas en z-index -1) passe
+  // derrière le contenu de la page mais devant le fond du <body>, qui sinon le recouvrirait
+  isolation: isolate;
   display: grid;
   gap: 18px;
   max-width: 1180px;

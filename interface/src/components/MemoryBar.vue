@@ -218,6 +218,10 @@ const fmtRate = (mbs: number) => `${mbs >= 0 ? '+' : '−'}${Math.round(Math.abs
 
 .delta {
   @include numeric;
+  // largeur fixe (de « +0 MB » à « −999 MB » ou « −1.2 GB ») : la courbe à côté ne bouge plus
+  display: inline-block;
+  min-width: 10ch;
+  font-variant-numeric: tabular-nums;
   color: var(--muted);
   font-size: 12px;
 
