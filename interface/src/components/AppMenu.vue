@@ -1,14 +1,33 @@
 <script setup lang="ts">
 // Menu de l'en-tête : Ace pilot et affichage en tête, puis alertes (activables
 // une par une) et tests, dépliables.
-// Les réglages sont mémorisés dans le navigateur (settings.ts). D'autres sections viendront (seuils RAM…).
+// Les réglages sont mémorisés dans le navigateur (settings.ts), sauf le dossier du jeu, gardé par le service.
 // Se ferme avec Échap ou un clic à l'extérieur ; un clic dans le menu (case à cocher) le laisse ouvert.
-import { onBeforeUnmount, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import { TESTS, type TestKind, shownAlert, triggerTest } from '@/alerts'
 import { flash } from '@/hit'
 import { ALERT_GROUPS, COMPONENT_ALERTS, settings } from '@/settings'
+import { bool, has, sendGameDir, str, tm } from '@/telemetry'
 import { awake } from '@/wakelock'
 import AboutPanel from './AboutPanel.vue'
+
+// Dossier du jeu (service/src/paths.ts) : détecté tout seul (jeu en cours, launcher RSI), ou choisi ici dans une
+// fenêtre Windows qui s'ouvre sur le PC du service
+const dirOpen = ref(false)
+const dir = computed(() => str('cfg.game_dir'))
+const DIR_SRC: Record<string, string> = {
+  game: 'Auto · from the running game',
+  launcher: 'Auto · last launch from the RSI Launcher',
+  default: 'Auto · default install folder',
+  manual: 'Chosen manually',
+  cli: 'Set by --game-dir',
+}
+const dirNote = computed(() => {
+  if (picking.value) return touch ? 'Pick the game on the PC screen…' : 'Pick StarCitizen.exe or Game.log in the window…'
+  const src = DIR_SRC[str('cfg.game_dir_src')] ?? ''
+  return tm['cfg.game_dir_ok'] === false ? `${src} · game not found here` : src
+})
+const picking = computed(() => bool('cfg.game_dir_picking')) // fenêtre de choix ouverte sur le PC
 
 // méthode en cours (diagnostic : la vidéo de repli ne marche pas sur tous les téléphones)
 const AWAKE_NOTE = { system: 'Active · system lock', video: 'Active · video fallback', pending: 'Tap anywhere on the page to activate' }
@@ -168,6 +187,25 @@ function onComponent(): void {
             <span class="sw" />{{ TESTS[k].label }}
           </button>
           <button type="button" class="hit" @click="test('hit')"><span class="sw" />Hit flash</button>
+        </div>
+      </section>
+
+      <!-- Dossier du jeu : détecté ou choisi (gardé par le service, commun à tous les écrans) -->
+      <section>
+        <button type="button" class="row" :aria-expanded="dirOpen" @click="dirOpen = !dirOpen">
+          <span>Game folder</span>
+          <span class="caret" :class="{ side: !dirOpen }">▾</span>
+        </button>
+        <div v-if="dirOpen" class="gamedir">
+          <template v-if="has('cfg.game_dir')">
+            <p class="path" :class="{ bad: tm['cfg.game_dir_ok'] === false }">{{ dir }}</p>
+            <p class="note" :class="{ pending: picking || tm['cfg.game_dir_ok'] === false }">{{ dirNote }}</p>
+            <div class="actions">
+              <button type="button" class="link" :disabled="picking" @click="sendGameDir('browse')">{{ touch ? 'Choose on PC…' : 'Choose…' }}</button>
+              <button v-if="str('cfg.game_dir_src') === 'manual'" type="button" class="link" @click="sendGameDir('auto')">Auto</button>
+            </div>
+          </template>
+          <p v-else class="note">Service not connected</p>
         </div>
       </section>
 
@@ -392,6 +430,36 @@ button:focus-visible,
     display: flex;
     justify-content: flex-end;
     padding: 2px 6px 4px;
+  }
+}
+
+// Dossier du jeu : chemin complet (coupé n'importe où : pas d'espace dans un chemin long), provenance, actions
+.gamedir {
+  padding: 2px 6px 4px 18px;
+
+  .path {
+    margin: 0 0 2px;
+    color: var(--text);
+    font: 500 11px var(--font-ui);
+    overflow-wrap: anywhere;
+
+    &.bad {
+      color: var(--amber);
+    }
+  }
+
+  .note {
+    padding: 0 0 4px;
+  }
+
+  .actions {
+    display: flex;
+    gap: 14px;
+  }
+
+  .link:disabled {
+    opacity: 0.45;
+    cursor: default;
   }
 }
 

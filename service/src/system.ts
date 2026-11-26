@@ -8,6 +8,7 @@
 //  - compteurs de performance Windows (pdh.dll) : charge GPU et VRAM utilisée.
 //
 // Une mesure toutes les 2 s, uniquement quand un écran est connecté. Historique borné à 120 s.
+import path from 'node:path'
 import koffi from 'koffi'
 import { flatten, type Flat } from './flat.ts'
 import { config } from './config.ts'
@@ -37,6 +38,9 @@ const getPerformanceInfo = kernel32.func('bool __stdcall K32GetPerformanceInfo(_
 const FILETIME = koffi.struct('FILETIME', { lo: 'uint32', hi: 'uint32' })
 const getSystemTimes = kernel32.func('bool __stdcall GetSystemTimes(_Out_ FILETIME *idle, _Out_ FILETIME *kernel, _Out_ FILETIME *user)')
 const ntQuery = ntdll.func('int __stdcall NtQuerySystemInformation(int cls, _Out_ uint8_t *buf, uint32 len, _Out_ uint32 *ret)')
+// même fonction, tampon en entrée-sortie (SystemProcessIdInformation : on y écrit le PID demandé)
+const ntQueryInOut = ntdll.func('int __stdcall NtQuerySystemInformation(int cls, uint8_t *buf, uint32 len, _Out_ uint32 *ret)')
+const queryDosDevice = kernel32.func('uint32 __stdcall QueryDosDeviceW(str16 name, uint8_t *buf, uint32 max)')
 
 // GPU via les compteurs de performance Windows (PDH), toutes marques de carte.
 // Choisi plutôt que nvml.dll (pilote NVIDIA) : ~11 Mo au lieu de ~20 Mo, 0,5 ms par mesure.
@@ -119,10 +123,10 @@ function loadGpu(): Gpu | null {
   }
 }
 
-// Mémoire privée (octets) et date de création de StarCitizen.exe, ou null s'il ne tourne pas.
+// Mémoire privée (octets), date de création et PID de StarCitizen.exe, ou null s'il ne tourne pas.
 // Offsets de SYSTEM_PROCESS_INFORMATION en 64 bits (les mêmes que l'outil PowerShell).
 let procBuf = Buffer.alloc(1 << 20)
-function readStarCitizen(): { privateBytes: number; created: number } | null {
+function readStarCitizen(): { privateBytes: number; created: number; pid: number } | null {
   const ret = [0]
   for (;;) {
     const st = ntQuery(5, procBuf, procBuf.length, ret)
@@ -132,7 +136,7 @@ function readStarCitizen(): { privateBytes: number; created: number } | null {
   }
   const base = BigInt(koffi.address(procBuf))
   let off = 0
-  let found: { privateBytes: number; created: number } | null = null
+  let found: { privateBytes: number; created: number; pid: number } | null = null
   for (;;) {
     const nameLen = procBuf.readUInt16LE(off + 0x38)
     const ptr = procBuf.readBigUInt64LE(off + 0x40)
@@ -141,7 +145,10 @@ function readStarCitizen(): { privateBytes: number; created: number } | null {
       if (at >= 0 && at + nameLen <= procBuf.length && procBuf.toString('utf16le', at, at + nameLen).toLowerCase() === SC_EXE) {
         const priv = Number(procBuf.readBigInt64LE(off + 0xc8))
         const created = Number(procBuf.readBigInt64LE(off + 0x20)) // FILETIME (100 ns depuis 1601)
-        found = found ? { privateBytes: found.privateBytes + priv, created: Math.min(found.created, created) } : { privateBytes: priv, created }
+        const pid = Number(procBuf.readBigUInt64LE(off + 0x50)) // UniqueProcessId
+        found = found
+          ? { privateBytes: found.privateBytes + priv, created: Math.min(found.created, created), pid: found.pid }
+          : { privateBytes: priv, created, pid }
       }
     }
     const next = procBuf.readUInt32LE(off)
@@ -151,6 +158,34 @@ function readStarCitizen(): { privateBytes: number; created: number } | null {
   return found
 }
 const fileTimeToMs = (ft: number) => ft / 1e4 - 11644473600000
+
+// Dossier du jeu en cours d'exécution (…\LIVE, …\PTU…), d'après le chemin de son exe. Toujours sans handle sur le
+// processus : NtQuerySystemInformation(SystemProcessIdInformation) donne « \Device\HarddiskVolume3\…\StarCitizen.exe »,
+// converti en lettre de lecteur avec QueryDosDevice. Appelé une fois par lancement du jeu.
+function gameDirOf(pid: number): string | null {
+  try {
+    const name = Buffer.alloc(4096) // 2 048 caractères
+    const info = Buffer.alloc(24) // { HANDLE ProcessId; UNICODE_STRING ImageName { Length, MaximumLength, Buffer } }
+    info.writeBigUInt64LE(BigInt(pid), 0)
+    info.writeUInt16LE(name.length, 10)
+    info.writeBigUInt64LE(BigInt(koffi.address(name)), 16)
+    if (ntQueryInOut(88, info, info.length, [0]) !== 0) return null
+    const nt = name.toString('utf16le', 0, info.readUInt16LE(8))
+    const dev = Buffer.alloc(1024)
+    for (let c = 65; c <= 90; c++) {
+      const drive = `${String.fromCharCode(c)}:`
+      const n = queryDosDevice(drive, dev, dev.length / 2)
+      if (!n) continue
+      const target = dev.toString('utf16le', 0, n * 2).split('\0')[0]!
+      if (nt.toLowerCase().startsWith(`${target.toLowerCase()}\\`)) {
+        return path.dirname(path.dirname(drive + nt.slice(target.length))) // …\LIVE\Bin64\StarCitizen.exe → …\LIVE
+      }
+    }
+  } catch {
+    /* chemin illisible : le dossier vient alors du launcher (paths.ts) */
+  }
+  return null
+}
 
 // ---- Pente (Mo/s) par régression linéaire sur les `win` dernières secondes ----------
 interface Pt { t: number; mb: number }
@@ -179,6 +214,7 @@ export interface Sample {
   t: number
   scMb: number | null
   scStartedAt: number | null // ms : lancement du processus StarCitizen.exe
+  scDir: string | null // dossier du jeu qui tourne (…\LIVE, …\PTU) ; null : jeu fermé ou chemin illisible
   commitPct: number | null
   leak: LeakState | null
 }
@@ -200,6 +236,7 @@ export function createSystemMonitor(onSample?: (s: Sample) => void) {
   let hotSince: number | null = null
   let leak: { onsetMb: number; calmSince: number | null } | null = null
   let scCreated = 0
+  let scDir: string | null = null
 
   function cpuPct(): number | null {
     const i = { lo: 0, hi: 0 }, k = { lo: 0, hi: 0 }, u = { lo: 0, hi: 0 }
@@ -238,9 +275,9 @@ export function createSystemMonitor(onSample?: (s: Sample) => void) {
     // ---- Star Citizen + détection de fuite (logique de l'outil PowerShell) ----
     const sc = readStarCitizen()
     if (!sc) {
-      hist.length = 0; hotSince = null; leak = null; scCreated = 0
+      hist.length = 0; hotSince = null; leak = null; scCreated = 0; scDir = null
     } else {
-      if (sc.created !== scCreated) { hist.length = 0; hotSince = null; leak = null; scCreated = sc.created } // jeu (re)lancé
+      if (sc.created !== scCreated) { hist.length = 0; hotSince = null; leak = null; scCreated = sc.created; scDir = gameDirOf(sc.pid) } // jeu (re)lancé
       const mb = sc.privateBytes / 2 ** 20
       hist.push({ t: now, mb })
       longT.push(Math.round(now))
@@ -279,6 +316,7 @@ export function createSystemMonitor(onSample?: (s: Sample) => void) {
       t: now,
       scMb: typeof f['sc.private_mb'] === 'number' ? f['sc.private_mb'] : null,
       scStartedAt: sc ? fileTimeToMs(sc.created) : null,
+      scDir,
       commitPct: typeof f['sys.commit_pct'] === 'number' ? f['sys.commit_pct'] : null,
       leak: typeof f['sc.leak'] === 'string' ? (f['sc.leak'] as LeakState) : null,
     })

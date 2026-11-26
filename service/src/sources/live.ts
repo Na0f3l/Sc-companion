@@ -11,7 +11,7 @@ import type { Source } from './source.ts'
 const SERVICE = 'sc.game.telemetry.v1.GameTelemetryService'
 const RETRY_MS = 5000
 
-export function createLiveSource(gameDir: string, addr = '127.0.0.1:2942'): Source & { status(): string } {
+export function createLiveSource(gameDir: string, addr = '127.0.0.1:2942'): Source & { status(): string; close(): void } {
   const def = loadTelemetryDefinition(gameDir) // schéma lu dans StarCitizen.exe (voir schema.ts)
   // Décodeur fourni par le schéma (octets → objet), utilisé seulement à la lecture
   const stream = (def[SERVICE] as grpc.ServiceDefinition).TelemetryStream
@@ -58,9 +58,14 @@ export function createLiveSource(gameDir: string, addr = '127.0.0.1:2942'): Sour
     if (running && !retry) retry = setTimeout(() => ((retry = null), open()), RETRY_MS)
   }
 
-  return {
+  const self = {
     name: 'live',
     status: () => status,
+    /** Arrêt définitif (autre dossier du jeu : une nouvelle source le remplace). */
+    close() {
+      self.stop()
+      client.close()
+    },
     start() {
       if (running) return
       running = true
@@ -87,4 +92,5 @@ export function createLiveSource(gameDir: string, addr = '127.0.0.1:2942'): Sour
       return last
     },
   }
+  return self
 }

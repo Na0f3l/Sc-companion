@@ -113,6 +113,16 @@ export function sendConfig(key: 'leakRate' | 'leakDuration', value: number): voi
   if (!demo.value && ws?.readyState === WebSocket.OPEN) ws.send(JSON.stringify({ type: 'config', [key]: value }))
 }
 
+/**
+ * Dossier du jeu : « browse » ouvre la fenêtre de choix sur le PC du service, « auto » revient à la détection
+ * automatique. Le résultat revient dans cfg.game_dir, cfg.game_dir_src et cfg.game_dir_ok.
+ */
+export function sendGameDir(action: 'browse' | 'auto'): boolean {
+  if (demo.value || ws?.readyState !== WebSocket.OPEN) return false
+  ws.send(JSON.stringify({ type: 'gameDir', action }))
+  return true
+}
+
 // ---- Mode démo ----------------------------------------------------------------------
 // Voir les écrans sans jouer : l'affichage est figé sur des valeurs d'exemple (demo.ts). Pas de simulation, juste
 // les panneaux. Seulement hors partie (jeu fermé ou au menu) : la connexion au service reste ouverte en

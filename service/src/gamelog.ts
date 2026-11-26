@@ -18,6 +18,10 @@ export type GameMode = 'pu' | 'ac' | 'menu'
 const POLL_MS = 2000
 const MAX_FIRST_READ = 8 * 2 ** 20 // octets lus au plus au démarrage (fin du fichier)
 const MODE_RX = /gamerules="([^"]+)"|Requesting game mode [^/\s"]*\/(\w+)|(<Join PU>)|(<SystemQuit>)/g
+// Fin du chargement : « <Context Establisher Done> establisher="CReplicationModel" … gamerules="SC_Default" » (écran de
+// chargement fermé, personnage en jeu) ; un nouvel écran de chargement (« OpenLoadingScreen] Started ») le remet à zéro.
+// « OnClientSpawned » ne convient pas : depuis la 5.0, il est aussi écrit au menu, pour le personnage de l'écran d'accueil.
+const LOAD_RX = /OpenLoadingScreen\] Started|<Context Establisher Done> establisher="CReplicationModel".*?gamerules="(\w+)"/g
 
 // Blessures : notifications du HUD, ex. « Minor Injury Detected - Right leg - Tier 3 Treatment Required ».
 // Tier 3 = mineure, 2 = modérée, 1 = grave. Le jeu ne note PAS la guérison : voir clearInjuries().
@@ -144,6 +148,7 @@ export function createGameLogReader(gameDir: () => string, onEvent?: (e: LogEven
   let pos = 0
   let rest = '' // fin de ligne incomplète, gardée pour la lecture suivante
   let mode: GameMode | null = null
+  let loaded = false // chargement terminé, personnage en jeu (LOAD_RX)
   // partie du corps → tier (la dernière notification fait foi) et moment où on l'a lue
   const injuries = new Map<string, { tier: number; at: number }>()
   let events: LogEvent[] = []
@@ -296,10 +301,10 @@ export function createGameLogReader(gameDir: () => string, onEvent?: (e: LogEven
     try {
       size = fs.statSync(file).size
     } catch {
-      mode = null // pas de Game.log (jeu jamais lancé, autre dossier)
+      mode = null; loaded = false // pas de Game.log (jeu jamais lancé, autre dossier)
       return
     }
-    if (size < pos) { pos = 0; rest = ''; mode = null; injuries.clear(); events = []; dirty = true; me = { id: '', name: '' }; wrecks.clear(); pendingKills = []; downedAt = null; myItems.clear() } // nouveau fichier (jeu relancé)
+    if (size < pos) { pos = 0; rest = ''; mode = null; loaded = false; injuries.clear(); events = []; dirty = true; me = { id: '', name: '' }; wrecks.clear(); pendingKills = []; downedAt = null; myItems.clear() } // nouveau fichier (jeu relancé)
     if (size === pos) { flushKills(); pruneEvents(); return }
     if (pos === 0 && size > MAX_FIRST_READ) pos = size - MAX_FIRST_READ // premier passage : la fin suffit
     const fd = fs.openSync(file, 'r') // Node ouvre en lecture partagée : le jeu peut continuer d'écrire
@@ -323,6 +328,9 @@ export function createGameLogReader(gameDir: () => string, onEvent?: (e: LogEven
   function readLines(lines: string): void {
     const found = lastMode(lines)
     if (found) mode = found
+    LOAD_RX.lastIndex = 0
+    for (let m = LOAD_RX.exec(lines); m; m = LOAD_RX.exec(lines)) loaded = !!m[1] && m[1] !== 'SC_Frontend'
+    if (mode !== 'pu' && mode !== 'ac') loaded = false // menu, jeu quitté
     // blessures et soins dans l'ordre du log : une blessure soignée puis reprise reste affichée
     const changes: [number, () => void][] = []
     INJURY_RX.lastIndex = 0
@@ -387,6 +395,7 @@ export function createGameLogReader(gameDir: () => string, onEvent?: (e: LogEven
     },
     flat: (): Flat => {
       const out: Flat = mode ? { 'game.mode': mode } : {}
+      if (loaded) out['game.loaded'] = true
       for (const [part, i] of injuries) out[`injury.${part}`] = i.tier
       if (events.length) out['log.events'] = eventsJson
       return out

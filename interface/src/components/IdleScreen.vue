@@ -4,7 +4,7 @@
 // (transform, géré par la carte graphique).
 import { computed } from 'vue'
 
-export type IdleKind = 'link' | 'offline' | 'menu' | 'loading'
+export type IdleKind = 'link' | 'offline' | 'menu' | 'loading' | 'notelemetry'
 
 const props = defineProps<{ kind: IdleKind }>()
 defineEmits<{ demo: [] }>()
@@ -33,6 +33,13 @@ const TEXT: Record<IdleKind, { code: string; title: string; sub: string; hint: s
     title: 'Loading',
     sub: 'Waiting for your character to spawn',
     hint: 'Telemetry is live, data will appear in a moment',
+  },
+  // en jeu d'après le Game.log (chargement terminé), mais aucun flux de télémétrie (désactivée en 5.0)
+  notelemetry: {
+    code: 'TLM-NONE',
+    title: 'No telemetry',
+    sub: 'You are in game, but Star Citizen is not sending telemetry',
+    hint: 'This game version has telemetry turned off. RAM tracking and session recording keep working',
   },
 }
 const t = computed(() => TEXT[props.kind])
@@ -90,7 +97,8 @@ const ticks = Array.from({ length: 36 }, (_, i) => {
   min-height: calc(100dvh - 180px);
   padding: 24px 0;
 
-  &.is-link {
+  &.is-link,
+  &.is-notelemetry {
     --c: var(--amber);
   }
 }
@@ -120,12 +128,13 @@ const ticks = Array.from({ length: 36 }, (_, i) => {
   animation: spin 6s linear infinite;
 }
 
-// Menu : balayage plus lent ; service injoignable : pas de balayage
+// Menu : balayage plus lent ; service injoignable ou jeu sans télémétrie : pas de balayage (rien n'arrivera)
 .is-menu .sweep {
   animation-duration: 12s;
 }
 
-.is-link .sweep {
+.is-link .sweep,
+.is-notelemetry .sweep {
   display: none;
 }
 

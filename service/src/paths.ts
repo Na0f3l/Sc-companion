@@ -4,9 +4,9 @@
 // accessible en écriture même si l'appli est installée dans Program Files. Au premier lancement, les données de
 // l'ancien emplacement (service/data) y sont copiées (l'ancien dossier est laissé tel quel).
 //
-// Dossier du jeu : celui du dernier lancement noté par le launcher RSI dans son journal
-// (« Launching Star Citizen LIVE from (D:\Games\StarCitizen\LIVE) ») : autre disque, PTU, EPTU… ; sinon le
-// dossier d'installation par défaut. --game-dir le force.
+// Dossier du jeu : celui de StarCitizen.exe s'il tourne, sinon celui du dernier lancement noté par le launcher RSI
+// dans son journal (« Launching Star Citizen LIVE from (D:\Games\StarCitizen\LIVE) ») : autre disque, PTU, EPTU… ;
+// sinon le dossier d'installation par défaut. Un dossier choisi dans le menu, ou --game-dir, passe avant.
 import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
@@ -54,23 +54,62 @@ function fromLauncher(): string | null {
   return null
 }
 
-/**
- * Dossier du jeu à lire (Game.log) : forcé, sinon celui du launcher s'il existe, sinon le dossier par défaut.
- * Appelé à chaque lecture du Game.log (passage LIVE → PTU sans relancer le service) : le journal du launcher
- * n'est relu que s'il a changé (une simple date de modification sinon).
- */
-let cache = { mtime: -1, dir: DEFAULT_GAME_DIR }
-export function gameDir(forced?: string): string {
-  if (forced) return forced
+/** D'où vient le dossier du jeu : ligne de commande, choix dans le menu, jeu en cours, launcher, défaut. */
+export type GameDirSource = 'cli' | 'manual' | 'game' | 'launcher' | 'default'
+
+let forced = '' // --game-dir
+let manual = '' // choisi dans le menu (config.json), '' = automatique
+let running: string | null = null // dossier de StarCitizen.exe en cours d'exécution (system.ts)
+let lastRunning: string | null = null // le dernier vu, si le launcher ne dit rien
+
+export const setForcedGameDir = (dir: string | undefined): void => void (forced = dir ? normalizeGameDir(dir) : '')
+export const setManualGameDir = (dir: string): void => void (manual = dir)
+export function setRunningGameDir(dir: string | null): void {
+  running = dir
+  if (dir) lastRunning = dir
+}
+
+/** Chemin donné par l'utilisateur → dossier du jeu : …\Bin64\StarCitizen.exe, …\Game.log ou …\Bin64 → …\LIVE. */
+export function normalizeGameDir(p: string): string {
+  let dir = path.resolve(p.trim().replace(/^"(.*)"$/, '$1'))
+  if (/\.(exe|log)$/i.test(dir)) dir = path.dirname(dir)
+  if (path.basename(dir).toLowerCase() === 'bin64') dir = path.dirname(dir)
+  return dir
+}
+
+/** Le dossier contient-il un jeu (exe ou Game.log) ? */
+export const looksLikeGameDir = (dir: string): boolean =>
+  fs.existsSync(path.join(dir, 'Bin64', 'StarCitizen.exe')) || fs.existsSync(path.join(dir, 'Game.log'))
+
+let launcher = { mtime: -1, dir: null as string | null }
+function launcherDir(): string | null {
   let mtime = 0
   try {
     mtime = fs.statSync(LAUNCHER_LOG).mtimeMs
   } catch {
     /* pas de launcher */
   }
-  if (mtime !== cache.mtime) {
+  if (mtime !== launcher.mtime) { // journal relu seulement s'il a changé
     const dir = fromLauncher()
-    cache = { mtime, dir: dir && fs.existsSync(dir) ? dir : DEFAULT_GAME_DIR }
+    launcher = { mtime, dir: dir && fs.existsSync(dir) ? dir : null }
   }
-  return cache.dir
+  return launcher.dir
 }
+
+/**
+ * Dossier du jeu (Game.log, schéma de télémétrie) et sa provenance. Par ordre de priorité : --game-dir, choix du
+ * menu, jeu en cours d'exécution (le plus sûr : LIVE, PTU, autre disque, lancé sans le launcher…), dernier
+ * lancement noté par le launcher, dernier jeu vu tournant, dossier par défaut.
+ * Appelé à chaque lecture du Game.log : passage LIVE → PTU suivi sans relancer le service.
+ */
+export function gameDirInfo(): { dir: string; src: GameDirSource } {
+  if (forced) return { dir: forced, src: 'cli' }
+  if (manual) return { dir: manual, src: 'manual' }
+  if (running) return { dir: running, src: 'game' }
+  const l = launcherDir()
+  if (l) return { dir: l, src: 'launcher' }
+  if (lastRunning) return { dir: lastRunning, src: 'game' }
+  return { dir: DEFAULT_GAME_DIR, src: 'default' }
+}
+
+export const gameDir = (): string => gameDirInfo().dir

@@ -14,6 +14,8 @@
 //       /data/…      → données des vaisseaux et leur mise à jour (shipdata.ts)
 // WS    /ws          → { type: 'snapshot', data } à la connexion, puis { type: 'patch', set, del } à 5 Hz max
 //                    ← { type: 'config', leakRate?, leakDuration? } : réglages communs (config.ts), renvoyés en cfg.*
+//                    ← { type: 'gameDir', action: 'browse' | 'auto' } : dossier du jeu (fenêtre de choix sur le PC,
+//                      ou retour à la détection automatique), renvoyé en cfg.game_dir*
 import http from 'node:http'
 import os from 'node:os'
 import { WebSocketServer, type WebSocket } from 'ws'
@@ -23,9 +25,10 @@ import { createLazyLiveSource } from './sources/lazy.ts'
 import type { Source } from './sources/source.ts'
 import { createSystemMonitor } from './system.ts'
 import { createGameLogReader } from './gamelog.ts'
-import { configFlat, updateConfig } from './config.ts'
+import { configFlat, setGameDir, updateConfig } from './config.ts'
 import { createSessionRecorder } from './sessions.ts'
-import { gameDir } from './paths.ts'
+import { gameDir, setForcedGameDir, setRunningGameDir } from './paths.ts'
+import { pickGameFile } from './picker.ts'
 import { createTray, openUrl } from './tray.ts'
 import { hasInterface, serveStatic } from './static.ts'
 import { checkLatest, serveData } from './shipdata.ts'
@@ -41,7 +44,8 @@ const TICK_MS = 200 // 5 envois par seconde au maximum
 
 // Par défaut : le jeu en direct. --replay <fichier|dossier> pour rejouer des captures.
 const replay = opt('replay')
-const source: Source = replay ? createReplaySource(replay) : createLazyLiveSource(() => gameDir(opt('game-dir')), opt('addr'))
+setForcedGameDir(opt('game-dir'))
+const source: Source = replay ? createReplaySource(replay) : createLazyLiveSource(gameDir, opt('addr'))
 // Mesures et lecture du Game.log : en permanence (une mesure / 2 s), écran ouvert ou non, pour enregistrer
 // les sessions de jeu. La télémétrie du jeu (source) est ouverte tant que le jeu tourne (ou qu'un écran est
 // connecté) : sans écran, une seule trame décodée toutes les 2 s (siège, solde) ; la diffusion attend un écran.
@@ -50,6 +54,7 @@ let gameRunning = false
 const system = createSystemMonitor((s) => {
   sessions.onSample(s)
   gameRunning = s.scMb !== null
+  setRunningGameDir(s.scDir) // dossier du jeu qui tourne : Game.log et schéma de télémétrie de ce jeu-là
   // infobulle de l'icône : état du jeu (texte changé seulement quand il change, au dixième de Go près)
   tray?.setTip(
     s.scMb === null
@@ -64,7 +69,7 @@ const system = createSystemMonitor((s) => {
     if (frame) observe(flatten(frame))
   }
 }) // mémoire SC / système, CPU, GPU, fuite
-const gameLog = createGameLogReader(() => gameDir(opt('game-dir')), (e) => sessions.onEvent(e)) // mode de jeu, blessures, événements
+const gameLog = createGameLogReader(gameDir, (e) => sessions.onEvent(e)) // mode de jeu, blessures, événements
 
 // ---- Diffusion ------------------------------------------------------------------
 let state: Flat = {} // dernier état envoyé aux écrans
@@ -106,7 +111,9 @@ function tick(): void {
   if (typeof healthMax === 'number' && healthMax >= 99.9) gameLog.clearInjuries()
   if (frame) observe(frameFlat)
   const live = sessions.current()
-  const next = { ...frameFlat, ...system.flat(), ...gameLog.flat(), ...configFlat(), ...(live ? { 'session.live': live } : {}) }
+  // état du flux de télémétrie (live, game not found, stream ended…) : distinguer « chargement » et « jeu sans télémétrie »
+  const tele = { 'svc.telemetry': source.status?.() ?? source.name }
+  const next = { ...frameFlat, ...system.flat(), ...gameLog.flat(), ...configFlat(), ...tele, ...(live ? { 'session.live': live } : {}) }
   const patch = diff(state, next)
   state = next
   if (!patch) return
@@ -207,8 +214,10 @@ wss.on('connection', (ws) => {
   ws.send(JSON.stringify({ type: 'snapshot', source: source.name, data: state }))
   ws.on('message', (raw) => {
     try {
-      const msg = JSON.parse(String(raw)) as { type?: string }
+      const msg = JSON.parse(String(raw)) as { type?: string; action?: string }
       if (msg.type === 'config') updateConfig(msg as Record<string, unknown>) // diffusé à tous au tick suivant
+      else if (msg.type === 'gameDir' && msg.action === 'auto') setGameDir('')
+      else if (msg.type === 'gameDir' && msg.action === 'browse') void pickGameFile(gameDir()).then((p) => p && setGameDir(p))
     } catch {
       /* message illisible : ignoré */
     }

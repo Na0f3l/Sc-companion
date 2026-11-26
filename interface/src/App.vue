@@ -1,7 +1,7 @@
 <script setup lang="ts">
 // Page principale : choisit les écrans selon le contexte du personnage (à pied / aux commandes).
 import { computed, onMounted, ref, watch, watchEffect } from 'vue'
-import { ACT, VEH, connect, demo, demoView, exitDemo, has, link, showDemo, source, str } from './telemetry'
+import { ACT, VEH, bool, connect, demo, demoView, exitDemo, has, link, showDemo, source, str } from './telemetry'
 import { alertLevel } from './alerts'
 import { soundOn, soundUnlocked, toggleSound } from './sound'
 import './hit' // flash rouge 0,2 s quand on prend des dégâts
@@ -47,13 +47,16 @@ watchEffect(() => {
 })
 
 // Contexte affiché, du plus « bloquant » au plus précis :
-//  service injoignable → jeu non lancé → menu → chargement → à pied / en vol
+//  service injoignable → jeu non lancé → menu → chargement (ou en jeu sans télémétrie) → à pied / en vol
 const gameCtx = computed<'vol' | 'pied' | IdleKind>(() => {
   if (demo.value) return demoView.value === 'ship' ? 'vol' : 'pied'
   if (link.value !== 'online') return 'link'
   if (!has('sc.private_mb')) return 'offline' // StarCitizen.exe absent (mesuré par le service)
   if (str('game.mode') === 'menu') return 'menu'
-  if (!has(`${ACT}state.locomotion`)) return 'loading'
+  if (!has(`${ACT}state.locomotion`)) {
+    // chargement terminé d'après le Game.log mais pas de flux du jeu : télémétrie coupée (5.0), pas un chargement
+    return bool('game.loaded') && str('svc.telemetry') !== 'live' ? 'notelemetry' : 'loading'
+  }
   const seated = str(`${ACT}state.locomotion`).endsWith('SEATED')
   return seated && has(`${VEH}class_name`) ? 'vol' : 'pied'
 })
@@ -69,7 +72,7 @@ function pickTab(view: 'foot' | 'ship'): void {
   else peek.value = view === 'foot'
 }
 const soundLabel = computed(() => (!soundOn.value ? 'Sound off' : soundUnlocked.value ? 'Sound on' : 'Click to enable sound'))
-const IDLE_LABEL: Record<string, string> = { link: 'No link', offline: 'Game not running', menu: 'Main menu', loading: 'Loading' }
+const IDLE_LABEL: Record<string, string> = { link: 'No link', offline: 'Game not running', menu: 'Main menu', loading: 'Loading', notelemetry: 'No telemetry' }
 const idle = computed(() => (ctx.value === 'vol' || ctx.value === 'pied' ? null : ctx.value))
 const shipClass = computed(() => str(`${VEH}class_name`))
 const ship = computed(() => shipName(shipClass.value))
