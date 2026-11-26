@@ -48,6 +48,29 @@ export function shipInfo(className: string): Ship | undefined {
   return SHIPS.value[className]
 }
 
+/**
+ * Vaisseaux dont le nom contient tous les mots tapés (nom ou constructeur, sans casse), noms commençant par la
+ * saisie d'abord. Un seul résultat par nom : les variantes internes au même nom (« _BIS2950 », « _GS »…) sont
+ * écartées au profit du class_name le plus court, le vaisseau de base.
+ */
+export function searchShips(query: string, max = 8): { key: string; name: string; maker?: string }[] {
+  const q = query.trim().toLowerCase()
+  if (!q) return []
+  const words = q.split(/\s+/)
+  const byName = new Map<string, string>()
+  for (const [key, s] of Object.entries(SHIPS.value)) {
+    const hay = `${s.name} ${s.maker ?? ''}`.toLowerCase()
+    if (!words.every((w) => hay.includes(w))) continue
+    const prev = byName.get(s.name)
+    if (!prev || key.length < prev.length) byName.set(s.name, key)
+  }
+  const starts = (n: string) => (n.toLowerCase().startsWith(q) ? 0 : 1)
+  return [...byName]
+    .sort(([a], [b]) => starts(a) - starts(b) || a.localeCompare(b))
+    .slice(0, max)
+    .map(([name, key]) => ({ key, name, maker: SHIPS.value[key]!.maker }))
+}
+
 /** Nom affiché : nom du jeu si connu, sinon le class_name rendu lisible. */
 export function shipName(className: string): string {
   return SHIPS.value[className]?.name ?? className.replaceAll('_', ' ')

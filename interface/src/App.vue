@@ -75,6 +75,9 @@ const shipClass = computed(() => str(`${VEH}class_name`))
 const ship = computed(() => shipName(shipClass.value))
 // cadre du contexte dans l'en-tête : cliqué aux commandes, il ouvre la fiche du vaisseau (ShipInfo)
 const ctxEl = ref<HTMLElement>()
+// à pied (en direct), l'onglet Ship n'a pas d'écran à montrer : il ouvre la recherche de fiche vaisseau
+const shipInfo = ref<InstanceType<typeof ShipInfo>>()
+const shipSearch = (view: string) => view === 'ship' && !tabsLive.value
 // raccourci Mobile connect dans l'en-tête (aussi dans le menu) ; seulement sur le PC (localhost)
 const mobile = ref<InstanceType<typeof MobileConnect>>()
 
@@ -145,7 +148,7 @@ const TABS = [
       </div>
     </header>
 
-    <ShipInfo :anchor="gameCtx === 'vol' ? ctxEl : undefined" :ship="shipClass" />
+    <ShipInfo ref="shipInfo" :anchor="gameCtx === 'vol' ? ctxEl : undefined" :ship="gameCtx === 'vol' ? shipClass : ''" />
     <SessionsPanel />
     <AlertOverlay />
     <MemoryBar />
@@ -159,12 +162,14 @@ const TABS = [
         :key="t.view"
         type="button"
         class="tab"
-        :class="{ on: ctx === t.ctx }"
         :aria-current="ctx === t.ctx ? 'page' : undefined"
-        :disabled="!tabsLive"
-        @click="pickTab(t.view)"
+        :class="{ on: ctx === t.ctx, find: shipSearch(t.view) }"
+        :title="shipSearch(t.view) ? 'Look up any ship' : undefined"
+        :disabled="!tabsLive && !shipSearch(t.view)"
+        @click="shipSearch(t.view) ? shipInfo?.searchFrom($event.currentTarget as HTMLElement) : pickTab(t.view)"
       >
         {{ t.label }}
+        <svg v-if="shipSearch(t.view)" class="lens" viewBox="0 0 16 16" aria-hidden="true"><circle cx="6.5" cy="6.5" r="4.5" /><path d="M10 10l4.5 4.5" /></svg>
       </button>
       <span v-if="!tabsLive" class="tabs-hint">Follows the game</span>
     </nav>
@@ -410,6 +415,18 @@ const TABS = [
 
 .tab:disabled:not(.on) {
   opacity: 0.55;
+}
+
+// onglet Ship à pied : ouvre la recherche de fiche vaisseau (loupe)
+.lens {
+  width: 11px;
+  height: 11px;
+  margin-left: 6px;
+  vertical-align: -1px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
 }
 
 .tabs-hint {
