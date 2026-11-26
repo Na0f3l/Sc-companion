@@ -166,8 +166,8 @@ export async function generate(log: (msg: string) => void = () => {}) {
   const generated = new Date().toISOString().slice(0, 10)
   const version = wiki[0]?.version ?? null
   const sorted = sortKeys(ships)
-  log(`${Object.keys(sorted).length} véhicules (${Object.values(sorted).filter((s) => s.scm).length} avec vitesses, ${withG} avec G)`)
-  if (noWiki.length) log(`Absents du wiki (G seuls) : ${noWiki.join(', ')}`)
+  log(`${Object.keys(sorted).length} vehicles (${Object.values(sorted).filter((s) => s.scm).length} with speeds, ${withG} with G)`)
+  if (noWiki.length) log(`Not on the wiki (G only): ${noWiki.join(', ')}`)
   return {
     'ships.json': {
       generated,
@@ -282,5 +282,5 @@ export function serveData(req: http.IncomingMessage, res: http.ServerResponse): 
 // `npm run ships` (depuis service/) : régénère la copie livrée avec l'interface (interface/public/data)
 if (import.meta.main) {
   write(DEFAULT_DIR, await generate(console.log))
-  console.log(`→ ${DEFAULT_DIR} (puis npm run build dans interface/)`)
+  console.log(`→ ${DEFAULT_DIR} (then run npm run build in interface/)`)
 }

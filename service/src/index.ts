@@ -288,6 +288,6 @@ server.listen(PORT, () => {
   gameLog.start()
   startTray()
   void checkLatest() // nouvelle version du jeu sur le wiki ? (un appel, en arrière-plan)
-  console.log(`SC Companion service : http://localhost:${PORT}  (ws /ws, health /health)`)
+  console.log(`SC Companion service: http://localhost:${PORT}  (ws /ws, health /health)`)
   if (!hasInterface()) console.log('Interface not built yet: run "npm run build" in interface/')
 })
