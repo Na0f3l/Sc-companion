@@ -11,16 +11,16 @@
 //  - distance d'arrêt = vitesse de descente × temps de réaction + v² / (2 × décélération) ;
 //  - décélération = poussée verticale du vaisseau (G « Up » de SPViewer, voir ships.ts) moins la gravité,
 //    comptée à 1 g (la plupart des planètes) : un Gladius freine à ~8,9 g, une Mk V à ~1 g seulement ;
-//  - radar valide : « Crash imminent » (rouge) quand la distance d'arrêt dépasse la hauteur ;
+//  - radar valide : « Descent too fast » (orange) quand la distance d'arrêt dépasse 1 / 1,6 de la hauteur,
+//    puis « Crash imminent » (rouge) quand elle dépasse la hauteur ;
 //  - radar hors de portée : « Descent too fast » (orange) quand la distance d'arrêt dépasse la hauteur estimée :
-//    altitude − sol le plus haut possible, soit le sol vu au dernier passage sous 500 m + 300 m de relief,
-//    soit TERRAIN_MAX si on ne l'a pas encore vu. Jamais moins que la portée du radar (450 m).
+//    altitude − sol le plus haut possible, soit le sol vu au dernier passage sous 500 m + 50 m de relief ;
+//    sol jamais vu : pas d'alerte (blindSink). Jamais moins que la portée du radar (450 m).
 //    Rejoué sur les captures Mk V : orange 15 et 22 s avant l'impact, rouge à l'apparition du sol.
 // Train sorti ou vaisseau posé : aucune alerte (atterrissage voulu).
 import { computed } from 'vue'
 import { FLI, NO_VALUE, VEH, bool, has, num, str } from './telemetry'
 import { shipInfo } from './ships'
-import { settings } from './settings'
 
 const G = 9.81
 const PLANET_G = 1 // gravité supposée (prudent : les lunes sont plus faibles)
@@ -29,22 +29,22 @@ const RADAR_MAX = 600 // m : au-dessus, une altitude radar égale à l'altitude 
 const RADAR_RANGE = 450 // m : hauteur à laquelle le sol apparaît au radar (prudent)
 const MIN_SINK = 10 // m/s : en dessous, approche ou manœuvre près du sol, pas une chute
 const SKIM_SPEED = 100 // m/s : rase-mottes rapide, alerte quand le sol est à moins de skimLead s
+// Préavis orange (radar valide) : « Descent too fast » quand la distance d'arrêt × 1,6 dépasse la hauteur,
+// avant le rouge « Crash imminent » (distance d'arrêt × 1). Demandé par l'utilisateur (2026-11-27).
+const WARN_FACTOR = 1.6
 
 /**
- * Réglages selon le profil. « Ace pilot » (case du menu) : alertes bien plus tolérantes à la prise de risque.
+ * Réglages des alertes, tolérants à la prise de risque (ancien profil « Ace pilot », seul gardé depuis le
+ * 2026-11-27 : on part du principe que tout le monde pilote serré).
  *  - reaction : réaction du pilote + montée en poussée (annulée si le pilote freine déjà, voir trackBraking) ;
  *  - boost : décélération calculée avec le boost (G « Up » boostés) ;
  *  - terrainMax : altitude du sol supposée tant qu'on ne l'a pas vu (à ajuster selon les planètes) ;
  *  - terrainMargin : relief possible au-dessus du sol vu en dernier ;
  *  - skimLead : préavis de l'alerte rase-mottes (s) ;
  *  - blindSink : « Descent too fast » même quand le sol n'a jamais été vu (hauteur supposée via terrainMax).
- * Réglé après essais en Mk V et Gladius (2026-11-24) : normal un peu plus prudent, Ace bien plus tolérant.
+ * Réglé après essais en Mk V et Gladius (2026-11-24).
  */
-const PROFILES = {
-  normal: { reaction: 2, boost: false, terrainMax: 3000, terrainMargin: 400, skimLead: 2.5, blindSink: true },
-  ace: { reaction: 0.3, boost: true, terrainMax: 1000, terrainMargin: 50, skimLead: 0.8, blindSink: false },
-}
-const profile = () => (settings.acePilot ? PROFILES.ace : PROFILES.normal)
+const P = { reaction: 0.3, boost: true, terrainMax: 1000, terrainMargin: 50, skimLead: 0.8, blindSink: false }
 
 // Train sorti ou en cours de sortie. Attention : tous les états contiennent « DEPLOYMENT »
 // (VEHICLE_COMPONENT_DEPLOYMENT_STATE_RETRACTED…) : on teste la fin du nom.
@@ -63,13 +63,13 @@ export function radarHeight(): number | null {
 /** Décélération verticale disponible (m/s²) : poussée « Up » du vaisseau moins la gravité. */
 export function brakeAccel(): number {
   const ship = shipInfo(str(`${VEH}class_name`))
-  const up = (profile().boost ? ship?.gBoost?.[2] : undefined) ?? ship?.g?.[2] ?? DEFAULT_UP_G
+  const up = (P.boost ? ship?.gBoost?.[2] : undefined) ?? ship?.g?.[2] ?? DEFAULT_UP_G
   return Math.max(0.3, up - PLANET_G) * G
 }
 
 /** Distance (m) pour annuler une vitesse de descente `sink` (m/s), réaction comprise sauf si on freine déjà. */
 export function stopDistance(sink: number): number {
-  const reaction = braking ? 0 : profile().reaction
+  const reaction = braking ? 0 : P.reaction
   return sink * reaction + (sink * sink) / (2 * brakeAccel())
 }
 
@@ -136,13 +136,15 @@ function crashLevel(): () => CrashLevel {
     if (gearDown() || bool(`${VEH}flight.state.is_landed`) || !has(`${FLI}vertical_speed_indicator`)) return (level = null)
     const minSink = level ? MIN_SINK / 2 : MIN_SINK
     const k = level ? 1.25 : 1 // hystérésis : il faut 25 % de marge pour que l'alerte retombe
-    const need = stopDistance(sink) * k
+    const stop = stopDistance(sink)
+    const need = stop * k
     const h = radarHeight()
     let next: CrashLevel = null
     if (sink > minSink) {
-      if (h !== null) next = need > h ? 'crash' : null
-      else if (inAtmosphere() && (groundAlt !== null || profile().blindSink)) {
-        const ground = groundAlt !== null ? groundAlt + profile().terrainMargin : profile().terrainMax
+      // radar valide : orange dès que la distance d'arrêt atteint WARN_FACTOR × la hauteur, rouge à 1 ×
+      if (h !== null) next = stop * (level === 'crash' ? 1.25 : 1) > h ? 'crash' : need * WARN_FACTOR > h ? 'sink' : null
+      else if (inAtmosphere() && (groundAlt !== null || P.blindSink)) {
+        const ground = groundAlt !== null ? groundAlt + P.terrainMargin : P.terrainMax
         const room = Math.max(num(`${FLI}altitude`) - ground, RADAR_RANGE)
         next = need > room ? 'sink' : null
       }
@@ -165,5 +167,5 @@ export const skim = computed(() => {
   const h = radarHeight()
   if (h === null || gearDown() || bool(`${VEH}flight.state.is_landed`) || num(`${FLI}speed`) < SKIM_SPEED) return false
   const c = Math.max(sinkRate(), closing)
-  return c > 3 && h / c < profile().skimLead
+  return c > 3 && h / c < P.skimLead
 })

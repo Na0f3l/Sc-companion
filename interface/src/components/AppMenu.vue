@@ -1,5 +1,5 @@
 <script setup lang="ts">
-// Menu de l'en-tête : Ace pilot et affichage en tête, puis alertes (activables
+// Menu de l'en-tête : affichage en tête (écran tactile), puis alertes (activables
 // une par une) et tests, dépliables.
 // Les réglages sont mémorisés dans le navigateur (settings.ts), sauf le dossier du jeu, gardé par le service.
 // Se ferme avec Échap ou un clic à l'extérieur ; un clic dans le menu (case à cocher) le laisse ouvert.
@@ -93,22 +93,14 @@ function onComponent(): void {
     </button>
 
     <div v-if="open" class="panel">
-      <!-- Réglages directs : profil des alertes de vol, puis affichage -->
-      <section>
-        <!-- profil des alertes de vol : bien plus tolérant à la prise de risque (crash.ts) -->
+      <!-- garder l'écran allumé : téléphone / tablette seulement (sur PC, l'écran sert déjà au jeu) -->
+      <section v-if="touch">
         <label class="check">
-          <input v-model="settings.acePilot" type="checkbox" />
-          <span class="box" aria-hidden="true" />
-          Ace pilot
-        </label>
-        <p class="note">{{ settings.acePilot ? 'Late flight warnings, risk-tolerant' : 'Early flight warnings' }}</p>
-        <!-- garder l'écran allumé : téléphone / tablette seulement (sur PC, l'écran sert déjà au jeu) -->
-        <label v-if="touch" class="check">
           <input v-model="settings.keepAwake" type="checkbox" />
           <span class="box" aria-hidden="true" />
           Keep screen on
         </label>
-        <p v-if="touch && awake !== 'off'" class="note" :class="awake">{{ AWAKE_NOTE[awake] }}</p>
+        <p v-if="awake !== 'off'" class="note" :class="awake">{{ AWAKE_NOTE[awake] }}</p>
       </section>
 
       <!-- Alertes : sous-liste dépliable, une case par groupe -->
@@ -286,7 +278,7 @@ button:focus-visible,
   }
 }
 
-// ligne d'explication sous une case (Ace pilot, Keep screen on)
+// ligne d'explication sous une case (Keep screen on)
 .note {
   margin: 0;
   padding: 0 6px 4px 30px;

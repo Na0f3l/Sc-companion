@@ -34,7 +34,6 @@ interface Settings {
   sound: Record<AlertGroup, boolean> // son de chaque alerte, indépendant de son affichage
   components: Record<ComponentKey, boolean>
   keepAwake: boolean // garder l'écran allumé (wakelock.ts)
-  acePilot: boolean // alertes de vol bien plus tolérantes à la prise de risque (crash.ts, alerts.ts)
   ram: RamSettings // seuils des alertes mémoire (panneau de la bande RAM, MemoryBar.vue)
   migrations: string[] // changements de valeur par défaut déjà appliqués à ces réglages (voir load)
 }
@@ -54,7 +53,6 @@ const DEFAULTS: Settings = {
   components: Object.fromEntries(COMPONENT_ALERTS.map((c) => [c.key, c.key !== 'thr'])) as Record<ComponentKey, boolean>,
   // activé d'office sur écran tactile (téléphone, tablette) ; sur PC l'écran sert déjà au jeu
   keepAwake: window.matchMedia('(pointer: coarse)').matches,
-  acePilot: false,
   ram: { ...RAM_DEFAULTS },
   migrations: [],
 }
@@ -81,6 +79,7 @@ function load(): Settings {
       ram: { ...DEFAULTS.ram, ...saved.ram },
       migrations: [...(saved.migrations ?? [])],
     }
+    delete (s as { acePilot?: boolean }).acePilot // réglage retiré (2026-11-27) : on ne le garde pas en mémoire
     for (const [name, apply] of Object.entries(MIGRATIONS)) {
       if (s.migrations.includes(name)) continue
       if (raw) apply(s) // réglages neufs : les valeurs par défaut sont déjà les bonnes

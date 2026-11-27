@@ -35,6 +35,20 @@
   --bg: #0e0403;
 }
 
+// Verrouillé au radar (RADR orange ou rouge) : interface en jaune, PU comme AC, jusqu'au délock.
+// Après le mode (le remplace), avant les alertes (elles gardent la priorité le temps de leur affichage).
+:root[data-lock] {
+  --cyan: #f2c23b;
+  --cyan-dim: #7a6220;
+  --line: #4a3c14;
+  --off: #2a220c;
+  --text: #fff1c9;
+  --muted: #b39a5c;
+  --panel: #171206;
+  --panel-2: #211a09;
+  --bg: #0e0b03;
+}
+
 // Alerte critique : toute l'interface vire au rouge. On redéfinit seulement les variables,
 // le navigateur recolore tout d'un coup, sans JavaScript.
 :root[data-alert='critical'] {

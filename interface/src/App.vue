@@ -1,7 +1,7 @@
 <script setup lang="ts">
 // Page principale : choisit les écrans selon le contexte du personnage (à pied / aux commandes).
 import { computed, onMounted, ref, watch, watchEffect } from 'vue'
-import { ACT, VEH, bool, connect, demo, demoView, exitDemo, has, link, showDemo, source, str } from './telemetry'
+import { ACT, VEH, annunciator, bool, connect, demo, demoView, exitDemo, has, link, showDemo, source, str } from './telemetry'
 import { alertLevel } from './alerts'
 import { soundOn, soundUnlocked, toggleSound } from './sound'
 import './hit' // flash rouge 0,2 s quand on prend des dégâts
@@ -44,6 +44,12 @@ const gameMode = computed(() => str('game.mode'))
 const MODE_LABEL: Record<string, string> = { pu: 'PU', ac: 'Arena Commander', menu: 'Menu' }
 watchEffect(() => {
   document.documentElement.dataset.mode = gameMode.value
+})
+
+// Verrouillé au radar (voyant RADR orange ou rouge) : interface en jaune tant que le verrou dure
+watchEffect(() => {
+  const r = annunciator('radr')
+  document.documentElement.toggleAttribute('data-lock', r === 'minor' || r === 'major')
 })
 
 // Contexte affiché, du plus « bloquant » au plus précis :

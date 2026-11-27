@@ -13,7 +13,7 @@ import { computed, shallowRef, watch } from 'vue'
 import { ACT, FLI, VEH, annunciator, annunciatorFlashing, bool, has, num, str } from './telemetry'
 import { playAlert } from './sound'
 import { type AlertGroup, alertEnabled, alertSoundEnabled, componentAlertEnabled, settings } from './settings'
-import { flash } from './hit'
+import { flash, hitRecently } from './hit'
 import { crash, gearDown, skim } from './crash'
 
 export type AlertLevel = 'critical' | 'warning' | 'info'
@@ -57,23 +57,31 @@ export function triggerTest(kind: TestKind): void {
 // Ne s'allume qu'en DESCENDANT sous le seuil : une valeur qui remonte en restant dessous (ranimé après un coma,
 // on mange / boit un peu) ne déclenche rien. La dernière valeur connue est gardée même si le champ disparaît
 // un instant (chargement, réapparition).
+// Pas d'alerte au chargement de la page ni à l'arrivée en jeu (chargement AC, respawn) : il faut une vraie baisse
+// observée (valeur précédente connue), et les VITAL_SETTLE_MS qui suivent l'apparition du personnage sont ignorées
+// (les jauges arrivent par à-coups pendant le chargement). Une valeur à 0 (coma, mort) n'alerte jamais : trop tard.
+const VITAL_SETTLE_MS = 3000
 function lowVital(name: string, on = 0.25, off = 0.3): () => boolean {
   let low = false
   let prev: number | null = null
+  let since = 0 // instant où le personnage est apparu (0 = absent)
   return () => {
     // jeu fermé, au menu ou personnage pas encore là : restes de la partie précédente, rien à surveiller ;
     // on repart de zéro pour ne pas prendre l'arrivée en jeu pour une chute
     if (!has('sc.private_mb') || str('game.mode') === 'menu' || !has(`${ACT}state.locomotion`)) {
       prev = null
+      since = 0
       return (low = false)
     }
+    if (!since) since = performance.now()
     const k = `${ACT}vitals.${name}.current`
     // le jeu n'envoie pas les valeurs nulles : valeur absente mais maximum présent = 0 (ex. vie à 0 dans le coma)
     if (!has(k) && !has(`${ACT}vitals.${name}.max`)) return (low = false)
     // santé sur 100 comme dans le jeu (la vie max baisse avec les blessures) ; faim et soif sur leur maximum
     const ratio = num(k) / (name === 'health' ? 100 : num(`${ACT}vitals.${name}.max`, 100) || 100)
-    const falling = prev === null || ratio < prev
-    low = low ? ratio < off : ratio < on && falling
+    const settled = performance.now() - since >= VITAL_SETTLE_MS
+    const falling = settled && prev !== null && ratio < prev && ratio > 0
+    low = low ? ratio < off && ratio > 0 : ratio < on && falling
     prev = ratio
     return low
   }
@@ -99,13 +107,15 @@ function above(key: string, on: () => number, margin: number, scale = 1): () => 
  * Collision : voyant PROX du vaisseau au rouge, sauf en manœuvre de décollage / atterrissage :
  * train sorti, ou vitesse sous `minSpeed` (le voyant s'allume normalement près des hangars et des pads).
  */
-const proximity = (minSpeed: number) =>
-  annunciator('prox') === 'major' && !gearDown() && num(`${FLI}speed`) >= minSpeed
-// PROX rouge (dès 60 m/s, train rentré) : « Collision imminent » (rouge), Ace pilot compris (choix de l'utilisateur,
-// 2026-11-25). Le voyant orange seul s'allume tout le temps près du sol : ignoré. Un posé (train sorti, moins de
-// 60 m/s, posé) reste silencieux. Pendant une alerte crash, le sol est déjà signalé : pas de doublon PROX.
+const proximity = (level: 'minor' | 'major', minSpeed: number) =>
+  annunciator('prox') === level && !gearDown() && num(`${FLI}speed`) >= minSpeed
+// PROX (COLL dans le jeu) rouge (dès 60 m/s, train rentré) : « Collision imminent » (rouge)
+// (choix de l'utilisateur, 2026-11-25). PROX orange, mêmes conditions : « Collision risk » (orange), préavis
+// demandé par l'utilisateur (2026-11-27). Un posé (train sorti, moins de 60 m/s, posé) reste silencieux.
+// Pendant une alerte crash, le sol est déjà signalé : pas de doublon PROX.
 const OBSTACLE_MIN_SPEED = 60 // m/s
-const proxQuiet = () => bool(`${VEH}flight.state.is_landed`) || crash.value !== null
+// rouge : seule l'alerte crash rouge le masque ; orange : toute alerte crash (orange compris)
+const proxQuiet = (red = false) => bool(`${VEH}flight.state.is_landed`) || (red ? crash.value === 'crash' : crash.value !== null)
 
 // Niveaux :
 //  - critical : alerte importante, rouge, avec son
@@ -115,7 +125,8 @@ const proxQuiet = () => bool(`${VEH}flight.state.is_landed`) || crash.value !== 
 const RULES: AlertRule[] = [
   // Crash au sol : distance d'arrêt du vaisseau contre hauteur au-dessus du sol (voir crash.ts)
   { id: 'crash', group: 'crash', level: 'critical', message: 'Crash imminent', active: () => crash.value === 'crash', repeatMs: 3000 },
-  { id: 'collision', group: 'collision', level: 'critical', message: 'Collision imminent', active: () => proximity(OBSTACLE_MIN_SPEED) && !proxQuiet() },
+  { id: 'collision', group: 'collision', level: 'critical', message: 'Collision imminent', active: () => proximity('major', OBSTACLE_MIN_SPEED) && !proxQuiet(true) },
+  { id: 'collision-risk', group: 'collision', level: 'warning', message: 'Collision risk', active: () => proximity('minor', OBSTACLE_MIN_SPEED) && !proxQuiet() },
   { id: 'sink', group: 'crash', level: 'warning', message: 'Descent too fast', active: () => crash.value === 'sink', repeatMs: 6000 },
   { id: 'skim', group: 'crash', level: 'warning', message: 'Pull up', active: () => skim.value, repeatMs: 3000 },
   { id: 'health', group: 'health', level: 'critical', message: 'Critical health', active: lowVital('health') },
@@ -172,7 +183,7 @@ function repeatTick(): void {
   const t = performance.now()
   for (const rule of activeAlerts.value) {
     if (!rule.repeatMs || queue.includes(rule) || shownAlert.value === rule) continue
-    if (settings.acePilot && rule.level === 'warning') continue // Ace pilot : les orange ne se répètent pas
+    if (rule.level === 'warning') continue // les orange ne se répètent pas (alertes tolérantes)
     if (t - (lastShown.get(rule.id) ?? 0) >= rule.repeatMs) queue.push(rule)
   }
   if (!shownAlert.value) showNext()
@@ -259,10 +270,13 @@ watch(
 // d'un composant qui passe à l'orange (mineur) puis au rouge (majeur), ex. THR orange après des tirs sur la coque.
 // Alerte quand un voyant s'aggrave ET que le composant est alimenté depuis au moins 3 s : rallumer les
 // boucliers fait passer SHLD au rouge un instant, ce n'est pas un dégât.
+// needHit : alerte seulement juste après un coup reçu. WPN passe à l'orange en mode NAV (armes coupées par le
+// jeu) sans aucun dégât : faux « Weapons damaged » relevé en test réel (2026-11-27).
+const HIT_WINDOW_MS = 5000
 const COMPONENTS = [
   { ann: 'pwr', power: 'powerplants', name: 'Power plant' },
   { ann: 'thr', power: 'engines', name: 'Thrusters' },
-  { ann: 'wpn', power: 'weapons', name: 'Weapons' },
+  { ann: 'wpn', power: 'weapons', name: 'Weapons', needHit: true },
   { ann: 'cool', power: 'coolers', name: 'Coolers' },
   { ann: 'shld', power: 'shield_generators', name: 'Shields' },
 ] as const
@@ -281,6 +295,7 @@ for (const c of COMPONENTS) {
     (now, before) => {
       if (now <= before || !poweredSince || performance.now() - poweredSince < POWER_SETTLE_MS) return
       if (!componentAlertEnabled(c.ann)) return
+      if ('needHit' in c && !hitRecently(HIT_WINDOW_MS)) return
       const major = now === 2
       pushAlert({ id: `comp-${c.ann}-${now}`, group: 'components', level: major ? 'critical' : 'warning', message: `${c.name} ${major ? 'critical' : 'damaged'}` })
       if (alertEnabled('hit')) flash()

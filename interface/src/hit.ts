@@ -61,8 +61,15 @@ export function flash(): void {
   )
 }
 
+// Dernier coup reçu (instant), noté même si le flash est coupé dans le menu : sert à valider les alertes
+// de composants qui ne viennent que de dégâts (voir alerts.ts)
+let lastHit = -Infinity
+/** Vrai si on a pris un coup il y a moins de `ms` (ou si le voyant HIT est allumé en ce moment). */
+export const hitRecently = (ms: number): boolean => rank(str(`${VEH}annunciators.hit`)) > 0 || performance.now() - lastHit < ms
+
 // Dégâts détectés : flash seulement si l'alerte est activée dans le menu (le test, lui, passe toujours)
 function onHit(): void {
+  lastHit = performance.now()
   if (alertEnabled('hit')) flash()
 }
 
@@ -102,6 +109,7 @@ watch(
     if (r > rb || (r > 0 && r === rb && now !== before)) onHit()
     if (r > 0 && !hitTimer) hitTimer = setInterval(onHit, HIT_REPEAT_MS)
     else if (r === 0 && hitTimer) {
+      lastHit = performance.now() // le voyant s'éteint ~1,3 s après le dernier coup : la fenêtre part d'ici
       clearInterval(hitTimer)
       hitTimer = undefined
     }
